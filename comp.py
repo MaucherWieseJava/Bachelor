@@ -1,39 +1,61 @@
 import pyodbc
 import pandas as pd
+import os
 
 
-class DatabaseToExcelExporter:
-    def __init__(self, db_connection_string, output_file):
-        """
-        Initialisierung des Exporters mit Verbindungsdetails zur Datenbank und der Ausgabedatei.
-        """
+class ExcelExporterWithSummary:
+    def __init__(self, db_connection_string):
         self.db_connection_string = db_connection_string
-        self.output_file = output_file
 
-    def export_to_excel(self, queries_with_sheets):
-        """
-        Führt die SQL-Abfragen aus und schreibt die Ergebnisse direkt in eine Excel-Datei.
-
-        :param queries_with_sheets: Ein Dictionary, das SQL-Abfragen den gewünschten Sheet-Namen zuordnet.
-        """
+    def export_table_with_summary(self, table_name):
         try:
-            # Verbindung zur Datenbank herstellen
+            # Pfad für die zu speichernde Datei festlegen (Desktop)
+            desktop_path = os.path.join(os.environ["USERPROFILE"], "Desktop")
+            output_file = os.path.join(desktop_path, f"{table_name}_Export.xlsx")
+
+            # Datenbankverbindung herstellen
+            print("🔄 Verbinde mit der Datenbank...")
             conn = pyodbc.connect(self.db_connection_string)
 
-            # Excel-Writer für mehrere Sheets
-            with pd.ExcelWriter(self.output_file, engine='openpyxl') as writer:
-                for sheet_name, query in queries_with_sheets.items():
-                    print(f"🔄 Exportiere Daten für Sheet: {sheet_name} ...")
+            # Alle Daten aus der Tabelle abrufen
+            query = f"SELECT * FROM {table_name}"
+            print(f"🔍 Lade vollständige Daten aus der Tabelle '{table_name}'...")
+            df = pd.read_sql_query(query, conn)
 
-                    # SQL-Abfrage ausführen und Daten abrufen
-                    df = pd.read_sql_query(query, conn)
+            # Sicherstellen, dass wichtige Spalten vorhanden sind
+            if 'Customer_Name' not in df.columns or 'RKMDAT' not in df.columns:
+                print("❌ Fehler: Die Tabelle muss die Spalten 'Customer_Name' und 'RKMDAT' enthalten.")
+                return
 
-                    # Daten in das entsprechende Sheet der Excel-Datei schreiben
-                    df.to_excel(writer, sheet_name=sheet_name, index=False)
+            # Erstellung der Zusammenfassung
+            print("📊 Erstelle Zusammenfassungstabellen basierend auf 'RKMDAT' und 'Customer_Name'...")
+            customer_names = df['Customer_Name'].unique()  # Eindeutige Kunden ermitteln
+            rkmdat_values = df['RKMDAT'].unique()  # Eindeutige RKMDAT-Werte ermitteln
 
-            # Verbindung zur Datenbank schließen
+            # Leeres DataFrame für die Zusammenfassung
+            summary_df = pd.DataFrame(columns=['RKMDAT'] + list(customer_names))
+
+            # Zusammenfassung aufbauen
+            for rkmdat in rkmdat_values:
+                row = {'RKMDAT': rkmdat}  # Start mit der RKMDAT-Wert
+                for customer in customer_names:
+                    # Anzahl der entsprechenden Zeilen zählen
+                    count = len(df[(df['RKMDAT'] == rkmdat) & (df['Customer_Name'] == customer)])
+                    row[customer] = count  # Zähler einfügen
+                summary_df = pd.concat([summary_df, pd.DataFrame([row])], ignore_index=True)
+
+            # Excel-Datei mit zwei Sheets speichern
+            print("💾 Speichere Daten in die Excel-Datei...")
+            with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
+                # Sheet1: Alle Daten
+                df.to_excel(writer, index=False, sheet_name="Sheet1")
+
+                # Sheet2: Zusammenfassung
+                summary_df.to_excel(writer, index=False, sheet_name="Sheet2")
+
+            # Verbindung schließen
             conn.close()
-            print(f"✅ Export erfolgreich! Datei gespeichert unter: {self.output_file}")
+            print(f"✅ Export erfolgreich! Datei gespeichert unter: {output_file}")
 
         except Exception as e:
             print(f"❌ Fehler beim Exportieren: {e}")
@@ -41,24 +63,17 @@ class DatabaseToExcelExporter:
 
 # Hauptprogramm
 if __name__ == '__main__':
-    # Verbindungseinstellungen für die Datenbank (z. B. SQL Server)
+    # Verbindungseinstellungen für die Datenbank
     db_connection_string = (
         "DRIVER={ODBC Driver 17 for SQL Server};"
-        "SERVER=your_server_name;"
-        "DATABASE=your_database_name;"
-        "Trusted_Connection=yes;"
+        "SERVER=your_server_name;"  # Anpassen
+        "DATABASE=your_database_name;"  # Anpassen
+        "Trusted_Connection=yes;"  # Windows-Authentifizierung
     )
 
-    # Ziel-Excel-Datei
-    output_file = "Database_Export.xlsx"
+    # Name der Tabelle
+    table_name = "your_table_name"  # Anpassen
 
-    # SQL-Abfragen mit den entsprechenden Sheet-Namen
-    queries_with_sheets = {
-        "Tabelle1": "SELECT * FROM your_table1",  # Daten für Sheet "Tabelle1"
-        "Tabelle2": "SELECT * FROM your_table2",  # Daten für Sheet "Tabelle2"
-        # Füge hier weitere Queries und Sheets hinzu
-    }
-
-    # Exporter-Klasse initialisieren und den Export starten
-    exporter = DatabaseToExcelExporter(db_connection_string, output_file)
-    exporter.export_to_excel(queries_with_sheets)
+    # Export starten
+    exporter = ExcelExporterWithSummary(db_connection_string)
+    exporter.export_table_with_summary(table_name)
