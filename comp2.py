@@ -50,27 +50,47 @@ class ExcelExporterWithSummary:
             print("🔢 Sortiere die Zusammenfassungsdaten nach 'RKMDAT' aufsteigend...")
             summary_df = summary_df.sort_values(by='RKMDAT', ascending=True)
 
-            # Erstellung der Zusammenfassung für Sheet3 (Filterung nach Deletion Type)
+            # Erstellung der Zusammenfassung für Sheet3 (Filterung nach Deletion Type 1, 2, 5)
             print("📊 Erstelle gefilterte Zusammenfassung für 'Deletion Type' (1, 2, 5)...")
-            filtered_df = df[df['Deletion_Type'].isin([1, 2, 5])]  # Nur Zeilen, die Deletion Type 1, 2 oder 5 haben
+            filtered_df_3 = df[df['Deletion_Type'].isin([1, 2, 5])]  # Nur Deletion Type 1, 2, 5
 
             # Leeres DataFrame für die gefilterte Zusammenfassung (Sheet3)
-            filtered_summary_df = pd.DataFrame(columns=['RKMDAT'] + list(customer_names))
+            filtered_summary_df_3 = pd.DataFrame(columns=['RKMDAT'] + list(customer_names))
 
             # Sheet3: Gefilterte Zusammenfassung erstellen
             for rkmdat in rkmdat_values:
                 row = {'RKMDAT': rkmdat}  # Start mit der RKMDAT-Wert
                 for customer in customer_names:
-                    # Anzahl der entsprechenden Zeilen zählen (unter Berücksichtigung von Deletion Type)
-                    count = len(
-                        filtered_df[(filtered_df['RKMDAT'] == rkmdat) & (filtered_df['Customer_Name'] == customer)])
+                    # Anzahl der entsprechenden Zeilen zählen (unter Berücksichtigung von Deletion Type = 1, 2, 5)
+                    count = len(filtered_df_3[
+                                    (filtered_df_3['RKMDAT'] == rkmdat) & (filtered_df_3['Customer_Name'] == customer)])
                     row[customer] = count  # Zähler einfügen
-                filtered_summary_df = pd.concat([filtered_summary_df, pd.DataFrame([row])], ignore_index=True)
+                filtered_summary_df_3 = pd.concat([filtered_summary_df_3, pd.DataFrame([row])], ignore_index=True)
 
             # Spalte A (RKMDAT) aufsteigend sortieren
-            filtered_summary_df = filtered_summary_df.sort_values(by='RKMDAT', ascending=True)
+            filtered_summary_df_3 = filtered_summary_df_3.sort_values(by='RKMDAT', ascending=True)
 
-            # Excel-Datei mit drei Sheets speichern
+            # Erstellung der Zusammenfassung für Sheet4 (Filterung nach Deletion Type 3, 4, 6, 7)
+            print("📊 Erstelle gefilterte Zusammenfassung für 'Deletion Type' (3, 4, 6, 7)...")
+            filtered_df_4 = df[df['Deletion_Type'].isin([3, 4, 6, 7])]  # Nur Deletion Type 3, 4, 6, 7
+
+            # Leeres DataFrame für die gefilterte Zusammenfassung (Sheet4)
+            filtered_summary_df_4 = pd.DataFrame(columns=['RKMDAT'] + list(customer_names))
+
+            # Sheet4: Gefilterte Zusammenfassung erstellen
+            for rkmdat in rkmdat_values:
+                row = {'RKMDAT': rkmdat}  # Start mit der RKMDAT-Wert
+                for customer in customer_names:
+                    # Anzahl der entsprechenden Zeilen zählen (unter Berücksichtigung von Deletion Type = 3, 4, 6, 7)
+                    count = len(filtered_df_4[
+                                    (filtered_df_4['RKMDAT'] == rkmdat) & (filtered_df_4['Customer_Name'] == customer)])
+                    row[customer] = count  # Zähler einfügen
+                filtered_summary_df_4 = pd.concat([filtered_summary_df_4, pd.DataFrame([row])], ignore_index=True)
+
+            # Spalte A (RKMDAT) aufsteigend sortieren
+            filtered_summary_df_4 = filtered_summary_df_4.sort_values(by='RKMDAT', ascending=True)
+
+            # Excel-Datei mit vier Sheets speichern
             print("💾 Speichere Daten in die Excel-Datei...")
             with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
                 # Sheet1: Alle Daten
@@ -79,8 +99,11 @@ class ExcelExporterWithSummary:
                 # Sheet2: Zusammenfassung (ohne Filterung)
                 summary_df.to_excel(writer, index=False, sheet_name="Sheet2")
 
-                # Sheet3: Gefilterte Zusammenfassung (nach Deletion Type)
-                filtered_summary_df.to_excel(writer, index=False, sheet_name="Sheet3")
+                # Sheet3: Gefilterte Zusammenfassung (Deletion Type 1, 2, 5)
+                filtered_summary_df_3.to_excel(writer, index=False, sheet_name="Sheet3")
+
+                # Sheet4: Gefilterte Zusammenfassung (Deletion Type 3, 4, 6, 7)
+                filtered_summary_df_4.to_excel(writer, index=False, sheet_name="Sheet4")
 
             # Verbindung schließen
             conn.close()
