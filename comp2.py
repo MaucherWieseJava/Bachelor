@@ -160,19 +160,24 @@ class ExcelExporterWithSummary:
         """
         cpo_nzg_df = nzg_df.copy()
 
+        # Iteration über jede Zeile der DataFrame
         for index, row in cpo_nzg_df.iterrows():
-            if index == 0:  # Überspringe Überschriften
+            # Überspringe nur die Kopfzeile (falls vorhanden), keine Datenzeile
+            if index == 0 and not isinstance(row[0], (int, float)):  # Kopfzeile enthält normalerweise Text
                 continue
 
+            # Prüfe RKMDAT-Wert aus Spalte A
             rkmdat = row[0]
             try:
-                rkmdat = int(rkmdat)
+                rkmdat = int(rkmdat)  # RKMDAT in eine Ganzzahl umwandeln
+                # Wähle den Multiplikator abhängig vom RKMDAT
                 factor = 59.9 if rkmdat > 202206 else 49.9
             except ValueError:
-                continue
+                continue  # Überspringe ungültige RKMDAT-Werte
 
-            for col in cpo_nzg_df.columns[1:]:
-                if pd.notna(row[col]) and isinstance(row[col], (int, float)):
+            # Multipliziere Werte in allen anderen Spalten (außer Spalte A)
+            for col in cpo_nzg_df.columns[1:]:  # Spalte A bleibt unverändert
+                if pd.notna(row[col]) and isinstance(row[col], (int, float)):  # Nur numerische Werte beachten
                     cpo_nzg_df.at[index, col] = row[col] * factor
 
         return cpo_nzg_df
