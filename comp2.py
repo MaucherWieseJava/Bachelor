@@ -47,10 +47,9 @@ class ExcelExporterWithSummary:
                 df, 'RKMDAT', [1, 2, 5], customer_names, rkmdat_values, amount_values, special_customer
             )
 
-            # Berechne die Widerrufsquote und füge sie als Spalten hinzu
-            print("🔢 Berechne Widerrufsquote...")
-            widerrufsquote_df = self.calculate_widerrufsquote(summary_df, filtered_summary_df_3, customer_names)
-            filtered_summary_df_3 = pd.concat([filtered_summary_df_3, widerrufsquote_df], axis=1)
+            # Berechne die Widerrufsquote und füge sie als separates Sheet hinzu
+            print("🔢 Berechne Widerrufsquote und erstelle neues Worksheet...")
+            widerrufsquote_df = self.calculate_widerrufsquote(summary_df, filtered_summary_df_3)
 
             # Generiere Sheet4 (Deletion Type 3, 4, 6, 7 für RKMDAT)
             print("📊 Erstelle gefilterte Daten für Deletion Type (3, 4, 6, 7)...")
@@ -74,7 +73,7 @@ class ExcelExporterWithSummary:
                 # Sheet2: Zusammenfassung (RKMDAT)
                 summary_df.to_excel(writer, index=False, sheet_name="#NZG")
 
-                # Sheet3: Gefilterte Zusammenfassung (Deletion Type 1, 2, 5 für RKMDAT & Widerrufsquote)
+                # Sheet3: Gefilterte Zusammenfassung (Deletion Type 1, 2, 5 für RKMDAT)
                 filtered_summary_df_3.to_excel(writer, index=False, sheet_name="Widerrufe")
 
                 # Sheet4: Gefilterte Zusammenfassung (Deletion Type 3, 4, 6, 7 für RKMDAT)
@@ -82,6 +81,9 @@ class ExcelExporterWithSummary:
 
                 # Sheet5: Gefilterte Zusammenfassung (Deletion Type 1, 2, 5 für DELLAT)
                 filtered_summary_df_5.to_excel(writer, index=False, sheet_name="#widfürRainer")
+
+                # Sheet6: Berechnetes Sheet für die Widerrufsquote
+                widerrufsquote_df.to_excel(writer, index=False, sheet_name="#Widerrufsquote")
 
             conn.close()
             print(f"✅ Export erfolgreich! Datei gespeichert unter: {output_file}")
@@ -125,20 +127,21 @@ class ExcelExporterWithSummary:
             filtered_df, column, customer_names, unique_values, amount_values, special_customer
         )
 
-    def calculate_widerrufsquote(self, summary_df, widerrufe_df, customer_names):
-        # Berechnet die Widerrufsquote und gibt ein DataFrame mit den Prozentsätzen zurück
-        widerrufsquote_df = pd.DataFrame()
+    def calculate_widerrufsquote(self, summary_df, widerrufe_df):
+        # Berechnet die Widerrufsquote und gibt ein DataFrame mit den Prozentsätzen als neues Sheet zurück
+        if summary_df.shape != widerrufe_df.shape:
+            raise ValueError("Die Tabellen für #NZG und Widerrufe müssen die gleiche Struktur haben.")
 
-        for customer in customer_names:
-            if customer in widerrufe_df.columns and customer in summary_df.columns:
-                # Berechnung der Widerrufsquote
-                widerrufsquote_df[f"{customer} - Widerrufsquote (%)"] = (
-                        widerrufe_df[customer] / summary_df[customer] * 100
-                ).fillna(0)  # Wenn Division durch 0, ersetzte den Wert durch 0
-            else:
-                # Falls der Kunde nicht in beiden DataFrames existiert
-                widerrufsquote_df[f"{customer} - Widerrufsquote (%)"] = 0
+        # Kopiere die Struktur von Widerrufe für die Quoten
+        widerrufsquote_df = widerrufe_df.copy()
 
+        # Starte bei Zeile 2 (lassen wir Überschriften aus) und rechne Zellenweise
+        for col in widerrufsquote_df.columns[1:]:  # Ignoriere Datumsspalte in Spalte A
+            widerrufsquote_df[col] = widerrufe_df[col] / summary_df[col].replace(0, pd.NA) * 100
+            widerrufsquote_df[col] = widerrufsquote_df[col].fillna(0)  # Ersetze Division durch NA mit 0
+
+        # Setze den Titel des Worksheets
+        widerrufsquote_df.columns = widerrufe_df.columns
         return widerrufsquote_df
 
 
