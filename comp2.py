@@ -18,7 +18,7 @@ class ExcelExporterWithSummary:
             conn = pyodbc.connect(self.db_connection_string)
 
             # Lade alle Daten aus der Tabelle
-            query = f"SELECT * FROM {table_name}"
+            query = f"SELECT * FROM [dbo].[Tabelle1$]"
             print(f"🔍 Lade Daten aus der Tabelle '{table_name}'...")
             df = pd.read_sql_query(query, conn)
 
@@ -47,6 +47,11 @@ class ExcelExporterWithSummary:
                 df, 'RKMDAT', [1, 2, 5], customer_names, rkmdat_values, amount_values, special_customer
             )
 
+            # Berechne die Widerrufsquote und füge sie als Spalten hinzu
+            print("🔢 Berechne Widerrufsquote...")
+            widerrufsquote_df = self.calculate_widerrufsquote(summary_df, filtered_summary_df_3, customer_names)
+            filtered_summary_df_3 = pd.concat([filtered_summary_df_3, widerrufsquote_df], axis=1)
+
             # Generiere Sheet4 (Deletion Type 3, 4, 6, 7 für RKMDAT)
             print("📊 Erstelle gefilterte Daten für Deletion Type (3, 4, 6, 7)...")
             filtered_summary_df_4 = self.create_filtered_summary_with_special_handling(
@@ -69,7 +74,7 @@ class ExcelExporterWithSummary:
                 # Sheet2: Zusammenfassung (RKMDAT)
                 summary_df.to_excel(writer, index=False, sheet_name="#NZG")
 
-                # Sheet3: Gefilterte Zusammenfassung (Deletion Type 1, 2, 5 für RKMDAT)
+                # Sheet3: Gefilterte Zusammenfassung (Deletion Type 1, 2, 5 für RKMDAT & Widerrufsquote)
                 filtered_summary_df_3.to_excel(writer, index=False, sheet_name="Widerrufe")
 
                 # Sheet4: Gefilterte Zusammenfassung (Deletion Type 3, 4, 6, 7 für RKMDAT)
@@ -119,6 +124,22 @@ class ExcelExporterWithSummary:
         return self.create_summary_with_special_handling(
             filtered_df, column, customer_names, unique_values, amount_values, special_customer
         )
+
+    def calculate_widerrufsquote(self, summary_df, widerrufe_df, customer_names):
+        # Berechnet die Widerrufsquote und gibt ein DataFrame mit den Prozentsätzen zurück
+        widerrufsquote_df = pd.DataFrame()
+
+        for customer in customer_names:
+            if customer in widerrufe_df.columns and customer in summary_df.columns:
+                # Berechnung der Widerrufsquote
+                widerrufsquote_df[f"{customer} - Widerrufsquote (%)"] = (
+                        widerrufe_df[customer] / summary_df[customer] * 100
+                ).fillna(0)  # Wenn Division durch 0, ersetzte den Wert durch 0
+            else:
+                # Falls der Kunde nicht in beiden DataFrames existiert
+                widerrufsquote_df[f"{customer} - Widerrufsquote (%)"] = 0
+
+        return widerrufsquote_df
 
 
 # Hauptprogramm
