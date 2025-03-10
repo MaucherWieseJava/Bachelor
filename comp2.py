@@ -18,7 +18,7 @@ class ExcelExporterWithSummary:
             conn = pyodbc.connect(self.db_connection_string)
 
             # Lade alle Daten aus der Tabelle
-            query = f"SELECT * FROM [dbo].[Tabelle1$]"
+            query = f"SELECT * FROM {table_name}"
             print(f"🔍 Lade Daten aus der Tabelle '{table_name}'...")
             df = pd.read_sql_query(query, conn)
 
@@ -125,6 +125,16 @@ class ExcelExporterWithSummary:
             summary_df = pd.concat([summary_df, pd.DataFrame([row])], ignore_index=True)
 
         return summary_df.sort_values(by=column, ascending=True)
+
+    def create_filtered_summary_with_special_handling(self, df, column, deletion_types, customer_names, unique_values,
+                                                      amount_values, special_customer):
+        """
+        Filtert Daten nach bestimmten Deletion Types und erstellt eine Zusammenfassung.
+        """
+        filtered_df = df[df['Deletion Type'].isin(deletion_types)]
+        return self.create_summary_with_special_handling(
+            filtered_df, column, customer_names, unique_values, amount_values, special_customer
+        )
 
     def calculate_widerrufsquote(self, summary_df, widerrufe_df):
         """
