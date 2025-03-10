@@ -18,7 +18,7 @@ class ExcelExporterWithSummary:
             conn = pyodbc.connect(self.db_connection_string)
 
             # Lade alle Daten aus der Tabelle
-            query = f"SELECT * FROM [dbo].[Tabelle1$]"
+            query = f"SELECT * FROM {table_name}"
             print(f"🔍 Lade Daten aus der Tabelle '{table_name}'...")
             df = pd.read_sql_query(query, conn)
 
@@ -33,28 +33,31 @@ class ExcelExporterWithSummary:
             customer_names = df['Customer Name'].unique()
             rkmdat_values = df['RKMDAT'].unique()
             amount_values = df['Amount'].unique()
+            special_customer = 'FO-SCL'  # Nur Customer FO-SCL wird unterteilt
 
             # Generiere Sheet2 (Zusammenfassung RKMDAT und Customer Name)
             print("📊 Erstelle Zusammenfassungen für RKMDAT...")
-            summary_df = self.create_summary_with_amounts(df, 'RKMDAT', customer_names, rkmdat_values, amount_values)
+            summary_df = self.create_summary_with_special_handling(
+                df, 'RKMDAT', customer_names, rkmdat_values, amount_values, special_customer
+            )
 
             # Generiere Sheet3 (Deletion Type 1, 2, 5 für RKMDAT)
             print("📊 Erstelle gefilterte Daten für Deletion Type (1, 2, 5)...")
-            filtered_summary_df_3 = self.create_filtered_summary_with_amounts(
-                df, 'RKMDAT', [1, 2, 5], customer_names, rkmdat_values, amount_values
+            filtered_summary_df_3 = self.create_filtered_summary_with_special_handling(
+                df, 'RKMDAT', [1, 2, 5], customer_names, rkmdat_values, amount_values, special_customer
             )
 
             # Generiere Sheet4 (Deletion Type 3, 4, 6, 7 für RKMDAT)
             print("📊 Erstelle gefilterte Daten für Deletion Type (3, 4, 6, 7)...")
-            filtered_summary_df_4 = self.create_filtered_summary_with_amounts(
-                df, 'RKMDAT', [3, 4, 6, 7], customer_names, rkmdat_values, amount_values
+            filtered_summary_df_4 = self.create_filtered_summary_with_special_handling(
+                df, 'RKMDAT', [3, 4, 6, 7], customer_names, rkmdat_values, amount_values, special_customer
             )
 
             # Generiere Sheet5 (Deletion Type 1, 2, 5 für DELLAT)
             print("📊 Erstelle gefilterte Daten für Deletion Type (1, 2, 5) mit 'DELLAT'...")
             dellat_values = df['DELLAT'].unique()
-            filtered_summary_df_5 = self.create_filtered_summary_with_amounts(
-                df, 'DELLAT', [1, 2, 5], customer_names, dellat_values, amount_values
+            filtered_summary_df_5 = self.create_filtered_summary_with_special_handling(
+                df, 'DELLAT', [1, 2, 5], customer_names, dellat_values, amount_values, special_customer
             )
 
             # Speichere die Daten in die Excel-Datei
@@ -81,28 +84,41 @@ class ExcelExporterWithSummary:
         except Exception as e:
             print(f"❌ Fehler beim Export: {e}")
 
-    def create_summary_with_amounts(self, df, column, customer_names, unique_values, amount_values):
-        # Erstellt eine Zusammenfassung, die alle 'Amount'-Werte als separate Spalten enthält
-        cols = [column] + [f"{customer} - {amount}" for customer in customer_names for amount in amount_values]
-        summary_df = pd.DataFrame(columns=cols)
+    def create_summary_with_special_handling(self, df, column, customer_names, unique_values, amount_values,
+                                             special_customer):
+        # Erstellt eine Zusammenfassung: Für FO-SCL werden Amount-Spalten erstellt, für andere normal
+        columns = [column]
+        for customer in customer_names:
+            if customer == special_customer:
+                columns += [f"{customer} - {amount}" for amount in amount_values]
+            else:
+                columns.append(customer)
+
+        summary_df = pd.DataFrame(columns=columns)
 
         for value in unique_values:
             row = {column: value}
             for customer in customer_names:
-                for amount in amount_values:
-                    count = len(df[(df[column] == value) &
-                                   (df['Customer Name'] == customer) &
-                                   (df['Amount'] == amount)])
-                    row[f"{customer} - {amount}"] = count
+                if customer == special_customer:
+                    for amount in amount_values:
+                        count = len(df[(df[column] == value) &
+                                       (df['Customer Name'] == customer) &
+                                       (df['Amount'] == amount)])
+                        row[f"{customer} - {amount}"] = count
+                else:
+                    count = len(df[(df[column] == value) & (df['Customer Name'] == customer)])
+                    row[customer] = count
             summary_df = pd.concat([summary_df, pd.DataFrame([row])], ignore_index=True)
 
         return summary_df.sort_values(by=column, ascending=True)
 
-    def create_filtered_summary_with_amounts(self, df, column, deletion_types, customer_names, unique_values,
-                                             amount_values):
+    def create_filtered_summary_with_special_handling(self, df, column, deletion_types, customer_names, unique_values,
+                                                      amount_values, special_customer):
         # Filtert die Daten nach Deletion Types und erstellt die Zusammenfassung
         filtered_df = df[df['Deletion Type'].isin(deletion_types)]
-        return self.create_summary_with_amounts(filtered_df, column, customer_names, unique_values, amount_values)
+        return self.create_summary_with_special_handling(
+            filtered_df, column, customer_names, unique_values, amount_values, special_customer
+        )
 
 
 # Hauptprogramm
@@ -114,7 +130,7 @@ if __name__ == '__main__':
         "Trusted_Connection=yes;"
     )
 
-    table_name = "EXSB"  # Anpassen
+    table_name = "your_table_name"  # Anpassen
 
     exporter = ExcelExporterWithSummary(db_connection_string)
     exporter.export_table_with_summary(table_name)
