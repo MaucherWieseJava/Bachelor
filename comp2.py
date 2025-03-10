@@ -18,7 +18,7 @@ class ExcelExporterWithSummary:
             conn = pyodbc.connect(self.db_connection_string)
 
             # Lade alle Daten aus der Tabelle
-            query = f"SELECT * FROM [dbo].[Tabelle1$]"
+            query = f"SELECT * FROM {table_name}"
             print(f"🔍 Lade Daten aus der Tabelle '{table_name}'...")
             df = pd.read_sql_query(query, conn)
 
@@ -86,7 +86,10 @@ class ExcelExporterWithSummary:
                 # Sheet5: Gefilterte Zusammenfassung (Deletion Type 1, 2, 5 für DELLAT)
                 filtered_summary_df_5.to_excel(writer, index=False, sheet_name="#widfürRainer")
 
-                # Sheet6: CPO_NZG
+                # Sheet6: Widerrufsquote
+                widerrufsquote_df.to_excel(writer, index=False, sheet_name="#Widerrufsquote")
+
+                # Sheet7: CPO_NZG
                 cpo_nzg_df.to_excel(writer, index=False, sheet_name="#CPO_NZG")
 
             conn.close()
@@ -123,40 +126,46 @@ class ExcelExporterWithSummary:
 
         return summary_df.sort_values(by=column, ascending=True)
 
+    def calculate_widerrufsquote(self, summary_df, widerrufe_df):
+        """
+        Berechnet die Widerrufsquote:
+        Widerrufsquote (%) = (Widerrufe / #NZG) * 100
+        """
+        if summary_df.shape != widerrufe_df.shape:
+            raise ValueError("Die Tabellen für #NZG und Widerrufe müssen die gleiche Struktur haben.")
+
+        widerrufsquote_df = widerrufe_df.copy()
+
+        for col in widerrufsquote_df.columns[1:]:  # Ignoriere die erste Spalte (Datumswerte)
+            widerrufsquote_df[col] = widerrufe_df[col] / summary_df[col].replace(0, pd.NA) * 100
+            widerrufsquote_df[col] = widerrufsquote_df[col].fillna(0)  # Ersetze Division durch 0 mit 0
+
+        widerrufsquote_df.columns = widerrufe_df.columns
+        return widerrufsquote_df
+
     def create_cpo_nzg(self, nzg_df):
         """
-        Erstellt das Sheet6: #CPO_NZG
+        Erstellt das Sheet: #CPO_NZG
         Multipliziert Werte in jeder Zelle mit 59,9 oder 49,9, basierend auf dem Wert von RKMDAT (Datumswert in Spalte A).
         """
-        cpo_nzg_df = nzg_df.copy()  # Kopiere die Struktur von Sheet2 (#NZG)
+        cpo_nzg_df = nzg_df.copy()
 
         for index, row in cpo_nzg_df.iterrows():
-            # Überspringe die erste Zeile (Überschriften)
-            if index == 0:
+            if index == 0:  # Überspringe Überschriften
                 continue
 
-            # Prüfe RKMDAT-Wert aus Spalte A
-            rkmdat = row[0]  # Spalte A
+            rkmdat = row[0]
             try:
-                rkmdat = int(rkmdat)  # RKMDAT-Wert in Ganzzahl umwandeln
+                rkmdat = int(rkmdat)
                 factor = 59.9 if rkmdat > 202206 else 49.9
             except ValueError:
-                continue  # Überspringe ungültige RKMDAT-Werte
+                continue
 
-            # Werte in allen anderen Spalten multiplizieren (außer Spalte A)
             for col in cpo_nzg_df.columns[1:]:
-                if pd.notna(row[col]) and isinstance(row[col], (int, float)):  # Nur auf numerische Werte anwenden
+                if pd.notna(row[col]) and isinstance(row[col], (int, float)):
                     cpo_nzg_df.at[index, col] = row[col] * factor
 
         return cpo_nzg_df
-
-    def create_filtered_summary_with_special_handling(self, df, column, deletion_types, customer_names, unique_values,
-                                                      amount_values, special_customer):
-        # Filtert die Daten nach Deletion Types und erstellt die Zusammenfassung
-        filtered_df = df[df['Deletion Type'].isin(deletion_types)]
-        return self.create_summary_with_special_handling(
-            filtered_df, column, customer_names, unique_values, amount_values, special_customer
-        )
 
 
 # Hauptprogramm
