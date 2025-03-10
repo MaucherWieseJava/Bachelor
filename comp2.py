@@ -23,7 +23,7 @@ class ExcelExporterWithSummary:
             df = pd.read_sql_query(query, conn)
 
             # Sicherstellen, dass wichtige Spalten vorhanden sind
-            required_columns = ['Customer_Name', 'RKMDAT', 'Deletion_Type']
+            required_columns = ['Customer Name', 'RKMDAT', 'DELLAT', 'Deletion Type']
             for col in required_columns:
                 if col not in df.columns:
                     print(f"❌ Fehler: Die Tabelle muss die Spalte '{col}' enthalten.")
@@ -31,7 +31,7 @@ class ExcelExporterWithSummary:
 
             # Erstellung der Zusammenfassung für Sheet2
             print("📊 Erstelle Zusammenfassungstabellen basierend auf 'RKMDAT' und 'Customer_Name'...")
-            customer_names = df['Customer_Name'].unique()  # Eindeutige Kunden ermitteln
+            customer_names = df['Customer Name'].unique()  # Eindeutige Kunden ermitteln
             rkmdat_values = df['RKMDAT'].unique()  # Eindeutige RKMDAT-Werte ermitteln
 
             # Leeres DataFrame für die Zusammenfassung (Sheet2)
@@ -39,93 +39,119 @@ class ExcelExporterWithSummary:
 
             # Sheet2: Zusammenfassung erstellen
             for rkmdat in rkmdat_values:
-                row = {'RKMDAT': rkmdat}  # Start mit der RKMDAT-Wert
+                row = {'RKMDAT': rkmdat}
                 for customer in customer_names:
                     # Anzahl der entsprechenden Zeilen zählen
-                    count = len(df[(df['RKMDAT'] == rkmdat) & (df['Customer_Name'] == customer)])
-                    row[customer] = count  # Zähler einfügen
+                    count = len(df[(df['RKMDAT'] == rkmdat) & (df['Customer Name'] == customer)])
+                    row[customer] = count
                 summary_df = pd.concat([summary_df, pd.DataFrame([row])], ignore_index=True)
 
-            # Spalte A (RKMDAT) aufsteigend sortieren
-            print("🔢 Sortiere die Zusammenfassungsdaten nach 'RKMDAT' aufsteigend...")
+            # Sortiere Zusammenfassungsdaten nach 'RKMDAT'
             summary_df = summary_df.sort_values(by='RKMDAT', ascending=True)
 
-            # Erstellung der Zusammenfassung für Sheet3 (Filterung nach Deletion Type 1, 2, 5)
+            # Filterungen für Deletion Type
+            deletion_filters = {
+                3: [1, 2, 5],  # Sheet3
+                4: [3, 4, 6, 7],  # Sheet4
+                5: [1, 2, 5],  # Sheet5 (neu für 'DELLAT')
+            }
+
+            filtered_sheets = {}
+
+            # Sheet3:
             print("📊 Erstelle gefilterte Zusammenfassung für 'Deletion Type' (1, 2, 5)...")
-            filtered_df_3 = df[df['Deletion_Type'].isin([1, 2, 5])]  # Nur Deletion Type 1, 2, 5
+}.${env}[uid-m.com.tabs(from.mgrance-directory)]~~
+Hier ist der vollständige und korrigierte Code mit der zusätzlichen Funktionalität für **Sheet5** (spielt mit der Spalte `DELLAT`):
 
-            # Leeres DataFrame für die gefilterte Zusammenfassung (Sheet3)
-            filtered_summary_df_3 = pd.DataFrame(columns=['RKMDAT'] + list(customer_names))
+```python
+import pyodbc
+import pandas as pd
+import os
 
-            # Sheet3: Gefilterte Zusammenfassung erstellen
-            for rkmdat in rkmdat_values:
-                row = {'RKMDAT': rkmdat}  # Start mit der RKMDAT-Wert
-                for customer in customer_names:
-                    # Anzahl der entsprechenden Zeilen zählen (unter Berücksichtigung von Deletion Type = 1, 2, 5)
-                    count = len(filtered_df_3[
-                                    (filtered_df_3['RKMDAT'] == rkmdat) & (filtered_df_3['Customer_Name'] == customer)])
-                    row[customer] = count  # Zähler einfügen
-                filtered_summary_df_3 = pd.concat([filtered_summary_df_3, pd.DataFrame([row])], ignore_index=True)
 
-            # Spalte A (RKMDAT) aufsteigend sortieren
-            filtered_summary_df_3 = filtered_summary_df_3.sort_values(by='RKMDAT', ascending=True)
+class ExcelExporterWithSummary:
+    def __init__(self, db_connection_string):
+        self.db_connection_string = db_connection_string
 
-            # Erstellung der Zusammenfassung für Sheet4 (Filterung nach Deletion Type 3, 4, 6, 7)
-            print("📊 Erstelle gefilterte Zusammenfassung für 'Deletion Type' (3, 4, 6, 7)...")
-            filtered_df_4 = df[df['Deletion_Type'].isin([3, 4, 6, 7])]  # Nur Deletion Type 3, 4, 6, 7
+    def export_table_with_summary(self, table_name):
+        try:
+            desktop_path = os.path.join(os.environ["USERPROFILE"], "Desktop")
+            output_file = os.path.join(desktop_path, f"{table_name}_Export.xlsx")
 
-            # Leeres DataFrame für die gefilterte Zusammenfassung (Sheet4)
-            filtered_summary_df_4 = pd.DataFrame(columns=['RKMDAT'] + list(customer_names))
+            print("🔄 Verbinde mit der Datenbank...")
+            conn = pyodbc.connect(self.db_connection_string)
 
-            # Sheet4: Gefilterte Zusammenfassung erstellen
-            for rkmdat in rkmdat_values:
-                row = {'RKMDAT': rkmdat}  # Start mit der RKMDAT-Wert
-                for customer in customer_names:
-                    # Anzahl der entsprechenden Zeilen zählen (unter Berücksichtigung von Deletion Type = 3, 4, 6, 7)
-                    count = len(filtered_df_4[
-                                    (filtered_df_4['RKMDAT'] == rkmdat) & (filtered_df_4['Customer_Name'] == customer)])
-                    row[customer] = count  # Zähler einfügen
-                filtered_summary_df_4 = pd.concat([filtered_summary_df_4, pd.DataFrame([row])], ignore_index=True)
+            query = f"SELECT * FROM {table_name}"
+            print(f"🔍 Lade Daten aus der Tabelle '{table_name}'...")
+            df = pd.read_sql_query(query, conn)
 
-            # Spalte A (RKMDAT) aufsteigend sortieren
-            filtered_summary_df_4 = filtered_summary_df_4.sort_values(by='RKMDAT', ascending=True)
+            required_columns = ['Customer Name', 'RKMDAT', 'DELLAT', 'Deletion Type']
+            for col in required_columns:
+                if col not in df.columns:
+                    print(f"❌ Fehler: Spalte '{col}' fehlt in der Tabelle.")
+                    return
 
-            # Excel-Datei mit vier Sheets speichern
+            customer_names = df['Customer Name'].unique()
+            rkmdat_values = df['RKMDAT'].unique()
+
+            # Generiere Sheet2 (Zusammenfassung RKMDAT und Customer_Name)
+            print("📊 Erstelle Zusammenfassungen für RKMDAT...")
+            summary_df = self.create_summary(df, 'RKMDAT', customer_names, rkmdat_values)
+
+            # Generiere Sheet3 (Deletion Type 1, 2, 5 für RKMDAT)
+            print("📊 Erstelle gefilterte Daten für Deletion Type (1, 2, 5)...")
+            filtered_summary_df_3 = self.create_filtered_summary(df, 'RKMDAT', [1, 2, 5], customer_names, rkmdat_values)
+
+            # Generiere Sheet4 (Deletion Type 3, 4, 6, 7 für RKMDAT)
+            print("📊 Erstelle gefilterte Daten für Deletion Type (3, 4, 6, 7)...")
+            filtered_summary_df_4 = self.create_filtered_summary(df, 'RKMDAT', [3, 4, 6, 7], customer_names, rkmdat_values)
+
+            # Generiere Sheet5 (Deletion Type 1, 2, 5 für DELLAT)
+            print("📊 Erstelle gefilterte Daten für Deletion Type (1, 2, 5) mit 'DELLAT'...")
+            dellat_values = df['DELLAT'].unique()
+            filtered_summary_df_5 = self.create_filtered_summary(df, 'DELLAT', [1, 2, 5], customer_names, dellat_values)
+
             print("💾 Speichere Daten in die Excel-Datei...")
             with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
-                # Sheet1: Alle Daten
-                df.to_excel(writer, index=False, sheet_name="Sheet1")
+                df.to_excel(writer, index=False, sheet_name="Gesamtdaten")
+                summary_df.to_excel(writer, index=False, sheet_name="#NZG")
+                filtered_summary_df_3.to_excel(writer, index=False, sheet_name="WIDfürAnalyse")
+                filtered_summary_df_4.to_excel(writer, index=False, sheet_name="#KDG")
+                filtered_summary_df_5.to_excel(writer, index=False, sheet_name="#widfürRainer")
 
-                # Sheet2: Zusammenfassung (ohne Filterung)
-                summary_df.to_excel(writer, index=False, sheet_name="Sheet2")
-
-                # Sheet3: Gefilterte Zusammenfassung (Deletion Type 1, 2, 5)
-                filtered_summary_df_3.to_excel(writer, index=False, sheet_name="Sheet3")
-
-                # Sheet4: Gefilterte Zusammenfassung (Deletion Type 3, 4, 6, 7)
-                filtered_summary_df_4.to_excel(writer, index=False, sheet_name="Sheet4")
-
-            # Verbindung schließen
             conn.close()
             print(f"✅ Export erfolgreich! Datei gespeichert unter: {output_file}")
 
         except Exception as e:
-            print(f"❌ Fehler beim Exportieren: {e}")
+            print(f"❌ Fehler beim Export: {e}")
+
+    def create_summary(self, df, column, customer_names, unique_values):
+        summary_df = pd.DataFrame(columns=[column] + list(customer_names))
+        for value in unique_values:
+            row = {column: value}
+            for customer in customer_names:
+                count = len(df[(df[column] == value) & (df['Customer Name'] == customer)])
+                row[customer] = count
+            summary_df = pd.concat([summary_df, pd.DataFrame([row])], ignore_index=True)
+        return summary_df.sort_values(by=column, ascending=True)
+
+    def create_filtered_summary(self, df, column, deletion_types, customer_names, unique_values):
+        filtered_df = df[df['Deletion Type'].isin(deletion_types)]
+        return self.create_summary(filtered_df, column, customer_names, unique_values)
 
 
 # Hauptprogramm
 if __name__ == '__main__':
-    # Verbindungseinstellungen für die Datenbank
     db_connection_string = (
         "DRIVER={ODBC Driver 17 for SQL Server};"
         "SERVER=your_server_name;"  # Anpassen
         "DATABASE=your_database_name;"  # Anpassen
-        "Trusted_Connection=yes;"  # Windows-Authentifizierung
+        "Trusted_Connection=yes;"
     )
 
-    # Name der Tabelle
     table_name = "your_table_name"  # Anpassen
 
-    # Export starten
     exporter = ExcelExporterWithSummary(db_connection_string)
     exporter.export_table_with_summary(table_name)
+```
+
