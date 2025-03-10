@@ -51,6 +51,10 @@ class ExcelExporterWithSummary:
             print("🔢 Berechne Widerrufsquote und erstelle neues Worksheet...")
             widerrufsquote_df = self.calculate_widerrufsquote(summary_df, filtered_summary_df_3)
 
+            # Generiere Sheet6 (CPO_NZG basierend auf Sheet2)
+            print("📂 Erstelle Worksheet für CPO_NZG...")
+            cpo_nzg_df = self.create_cpo_nzg(summary_df)
+
             # Generiere Sheet4 (Deletion Type 3, 4, 6, 7 für RKMDAT)
             print("📊 Erstelle gefilterte Daten für Deletion Type (3, 4, 6, 7)...")
             filtered_summary_df_4 = self.create_filtered_summary_with_special_handling(
@@ -82,8 +86,8 @@ class ExcelExporterWithSummary:
                 # Sheet5: Gefilterte Zusammenfassung (Deletion Type 1, 2, 5 für DELLAT)
                 filtered_summary_df_5.to_excel(writer, index=False, sheet_name="#widfürRainer")
 
-                # Sheet6: Berechnetes Sheet für die Widerrufsquote
-                widerrufsquote_df.to_excel(writer, index=False, sheet_name="#Widerrufsquote")
+                # Sheet6: CPO_NZG
+                cpo_nzg_df.to_excel(writer, index=False, sheet_name="#CPO_NZG")
 
             conn.close()
             print(f"✅ Export erfolgreich! Datei gespeichert unter: {output_file}")
@@ -119,6 +123,33 @@ class ExcelExporterWithSummary:
 
         return summary_df.sort_values(by=column, ascending=True)
 
+    def create_cpo_nzg(self, nzg_df):
+        """
+        Erstellt das Sheet6: #CPO_NZG
+        Multipliziert Werte in jeder Zelle mit 59,9 oder 49,9, basierend auf dem Wert von RKMDAT (Datumswert in Spalte A).
+        """
+        cpo_nzg_df = nzg_df.copy()  # Kopiere die Struktur von Sheet2 (#NZG)
+
+        for index, row in cpo_nzg_df.iterrows():
+            # Überspringe die erste Zeile (Überschriften)
+            if index == 0:
+                continue
+
+            # Prüfe RKMDAT-Wert aus Spalte A
+            rkmdat = row[0]  # Spalte A
+            try:
+                rkmdat = int(rkmdat)  # RKMDAT-Wert in Ganzzahl umwandeln
+                factor = 59.9 if rkmdat > 202206 else 49.9
+            except ValueError:
+                continue  # Überspringe ungültige RKMDAT-Werte
+
+            # Werte in allen anderen Spalten multiplizieren (außer Spalte A)
+            for col in cpo_nzg_df.columns[1:]:
+                if pd.notna(row[col]) and isinstance(row[col], (int, float)):  # Nur auf numerische Werte anwenden
+                    cpo_nzg_df.at[index, col] = row[col] * factor
+
+        return cpo_nzg_df
+
     def create_filtered_summary_with_special_handling(self, df, column, deletion_types, customer_names, unique_values,
                                                       amount_values, special_customer):
         # Filtert die Daten nach Deletion Types und erstellt die Zusammenfassung
@@ -126,23 +157,6 @@ class ExcelExporterWithSummary:
         return self.create_summary_with_special_handling(
             filtered_df, column, customer_names, unique_values, amount_values, special_customer
         )
-
-    def calculate_widerrufsquote(self, summary_df, widerrufe_df):
-        # Berechnet die Widerrufsquote und gibt ein DataFrame mit den Prozentsätzen als neues Sheet zurück
-        if summary_df.shape != widerrufe_df.shape:
-            raise ValueError("Die Tabellen für #NZG und Widerrufe müssen die gleiche Struktur haben.")
-
-        # Kopiere die Struktur von Widerrufe für die Quoten
-        widerrufsquote_df = widerrufe_df.copy()
-
-        # Starte bei Zeile 2 (lassen wir Überschriften aus) und rechne Zellenweise
-        for col in widerrufsquote_df.columns[1:]:  # Ignoriere Datumsspalte in Spalte A
-            widerrufsquote_df[col] = widerrufe_df[col] / summary_df[col].replace(0, pd.NA) * 100
-            widerrufsquote_df[col] = widerrufsquote_df[col].fillna(0)  # Ersetze Division durch NA mit 0
-
-        # Setze den Titel des Worksheets
-        widerrufsquote_df.columns = widerrufe_df.columns
-        return widerrufsquote_df
 
 
 # Hauptprogramm
