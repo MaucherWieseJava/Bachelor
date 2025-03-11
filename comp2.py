@@ -18,7 +18,7 @@ class ExcelExporterWithSummary:
             conn = pyodbc.connect(self.db_connection_string)
 
             # Lade alle Daten aus der Tabelle
-            query = f"SELECT * FROM {table_name}"
+            query = f"SELECT * FROM [dbo].[Tabbelle1$]"
             print(f"🔍 Lade Daten aus der Tabelle '{table_name}'...")
             df = pd.read_sql_query(query, conn)
 
@@ -91,6 +91,9 @@ class ExcelExporterWithSummary:
 
                 # Sheet7: CPO_NZG
                 cpo_nzg_df.to_excel(writer, index=False, sheet_name="#CPO_NZG")
+
+                cpo_wid_df.to_excel(writer, index=False, sheet_name="#CPO_WID")
+
 
             conn.close()
             print(f"✅ Export erfolgreich! Datei gespeichert unter: {output_file}")
@@ -181,6 +184,30 @@ class ExcelExporterWithSummary:
                     cpo_nzg_df.at[index, col] = row[col] * factor
 
         return cpo_nzg_df
+
+    def create_cpo_wid(self, filtered_summary_df_5):
+        cpo_wid_df = filtered_summary_df_5.copy()
+        for index, row in cpo_wid_df.iterrows():
+            if index == 0 and not isinstance(row[0], (int, float)):  # Kopfzeile enthält normalerweise Text
+                continue
+            #Bei DELLAT größer gleich 202206 *
+            dellat = row[0]
+            try:
+                dellat = int(dellat)
+                factor1 = 59.9 if dellat > 202206 else 49.9
+            except ValueError:
+                continue
+
+            for col in cpo_wid_df.columns[1:]:
+                if pd.notna(row[col]) and isinstance(row[col], (int, float)):
+                    cpo_wid_df.at[index, col] = row[col] * factor1
+
+        return cpo_wid_df
+
+
+
+
+
 
 
 # Hauptprogramm
