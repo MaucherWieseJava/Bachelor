@@ -55,6 +55,10 @@ class ExcelExporterWithSummary:
             print("📂 Erstelle Worksheet für CPO_NZG...")
             cpo_nzg_df = self.create_cpo_nzg(summary_df)
 
+            print("Erstelle Woksheet für CPO_WID...")
+            cpo_wid_df = self.create_cpo_wid(filtered_summary_df_5)
+
+
             # Generiere Sheet4 (Deletion Type 3, 4, 6, 7 für RKMDAT)
             print("📊 Erstelle gefilterte Daten für Deletion Type (3, 4, 6, 7)...")
             filtered_summary_df_4 = self.create_filtered_summary_with_special_handling(
