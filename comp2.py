@@ -55,8 +55,6 @@ class ExcelExporterWithSummary:
             print("📂 Erstelle Worksheet für CPO_NZG...")
             cpo_nzg_df = self.create_cpo_nzg(summary_df)
 
-            print("Erstelle Woksheet für CPO_WID...")
-            cpo_wid_df = self.create_cpo_wid(filtered_summary_df_5)
 
 
             # Generiere Sheet4 (Deletion Type 3, 4, 6, 7 für RKMDAT)
@@ -71,6 +69,10 @@ class ExcelExporterWithSummary:
             filtered_summary_df_5 = self.create_filtered_summary_with_special_handling(
                 df, 'DELLAT', [1, 2, 5], customer_names, dellat_values, amount_values, special_customer
             )
+
+            print("Erstelle Woksheet für CPO_WID...")
+            cpo_wid_df = self.create_cpo_wid(filtered_summary_df_5)
+
 
             # Speichere die Daten in die Excel-Datei
             print("💾 Speichere Daten in die Excel-Datei...")
@@ -234,3 +236,4 @@ if __name__ == '__main__':
 
     exporter = ExcelExporterWithSummary(db_connection_string)
     exporter.export_table_with_summary(table_name)
+
