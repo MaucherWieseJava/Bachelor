@@ -70,6 +70,7 @@ class ExcelExporterWithSummary:
                 df, 'DELLAT', [1, 2, 5], customer_names, dellat_values, amount_values, special_customer
             )
 
+            # Erstelle Worksheet für CPO_WID
             print("Erstelle Woksheet für CPO_WID...")
             cpo_wid_df = self.create_cpo_wid(filtered_summary_df_5)
 
