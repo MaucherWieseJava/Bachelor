@@ -189,12 +189,20 @@ class ExcelExporterWithSummary:
 
         return cpo_nzg_df
 
+    #This is a leng function
     def create_cpo_wid(self, filtered_summary_df_5):
+        # Überprüfen, ob der DataFrame gültig ist
+        if not isinstance(filtered_summary_df_5, pd.DataFrame) or filtered_summary_df_5.empty:
+            raise ValueError("Fehler: filtered_summary_df_5 ist leer oder ungültig.")
+
         cpo_wid_df = filtered_summary_df_5.copy()
+
+        # Iteration über DataFrame-Zeilen
         for index, row in cpo_wid_df.iterrows():
-            if index == 0 and not isinstance(row[0], (int, float)):  # Kopfzeile enthält normalerweise Text
+            if index == 0 and not isinstance(row[0], (int, float)):
                 continue
-            #Bei DELLAT größer gleich 202206 *
+
+            # Verarbeite the ting
             dellat = row[0]
             try:
                 dellat = int(dellat)
@@ -207,7 +215,6 @@ class ExcelExporterWithSummary:
                     cpo_wid_df.at[index, col] = row[col] * factor1
 
         return cpo_wid_df
-
 
 
 
