@@ -18,7 +18,7 @@ class ExcelExporterWithSummary:
             conn = pyodbc.connect(self.db_connection_string)
 
             # Lade alle Daten aus der Tabelle
-            query = f"SELECT * FROM [dbo].[Tabbelle1$]"
+            query = f"SELECT * FROM [dbo].[Tabelle1$]"
             print(f"🔍 Lade Daten aus der Tabelle '{table_name}'...")
             df = pd.read_sql_query(query, conn)
 
@@ -200,7 +200,7 @@ class ExcelExporterWithSummary:
 
         return cpo_wid_df
 
-    def create_ufc_nzg(df):
+    def create_ufc_nzg(self, df):
         # Definierte Variablen
         special_customer = "FO-SCL"
         amounts = [9.9, 14.9, 19.9, 24.9, 29.9]
