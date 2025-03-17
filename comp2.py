@@ -75,6 +75,9 @@ class ExcelExporterWithSummary:
             print("📂 Erstelle Worksheet UFC_NZG...")
             ufc_nzg_df = self.create_ufc_nzg(df)
 
+            print("📂 Erstelle Worksheet UFC_WID...")
+            ufc_wid_df = self.create_ufc_wid(df)
+
             # Speichere die Daten in die Excel-Datei
             print("💾 Speichere Daten in die Excel-Datei...")
             with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
@@ -103,6 +106,8 @@ class ExcelExporterWithSummary:
                 cpo_wid_df.to_excel(writer, index=False, sheet_name="#CPO_WID")
 
                 ufc_nzg_df.to_excel(writer, index=True, sheet_name="UFC_NZG")
+
+                ufc_wid_df.to_excel(writer, index=True, sheet_name="UFC_WID")
 
             conn.close()
             print(f"✅ Export erfolgreich! Datei gespeichert unter: {output_file}")
@@ -243,6 +248,55 @@ class ExcelExporterWithSummary:
                 # Werte setzen: 0 für rkmdat ≤ 202206, Multiplikation für rkmdat > 202206
                 pivot_df[column_name] = pivot_df.apply(
                     lambda row: row[column_name] * ufc_value if row.name > rkmdat_threshold else 0,
+                    axis=1
+                )
+
+        # Rückgabe der Pivot-Tabelle
+        return pivot_df
+
+    def create_ufc_wid(self, df):
+        # Definierte Variablen
+        special_customer = "FO-SCL"
+        amounts = [9.9, 14.9, 19.9, 24.9, 29.9]
+        dellat_threshold = 202206
+        ufc_values = {
+            9.9: 107.9949,
+            14.9: 162.5167,
+            19.9: 271.0588,
+            24.9: 271.6009,
+            29.9: 326.1226
+        }
+
+        # Filtere Daten für Customer Name = FO-SCL und Deletion Type in [1, 2, 5]
+        filtered_df = df[(df['Customer Name'] == special_customer) & (df['Deletion Type'].isin([1, 2, 5]))]
+
+        # Generiere eine neue DataFrame für das Worksheet
+        summary_data = []
+        grouped = filtered_df.groupby(['DELLAT', 'Amount'])
+
+        # Gruppiere nach dellat und den Amount-Werten
+        for (dellat, amount), group in grouped:
+            if amount in amounts:
+                count = len(group)  # Anzahl der Einträge
+                summary_data.append({'DELLAT': dellat, 'Amount': amount, 'Count': count})
+
+        # Umwandeln in DataFrame für Pivot-Tabelle
+        summary_df = pd.DataFrame(summary_data)
+
+        # Pivot: Zeilen sind 'DELLAT', Spalten sind 'Amount', Werte sind 'Count'
+        pivot_df = summary_df.pivot(index='DELLAT', columns='Amount', values='Count').fillna(0)
+        pivot_df = pivot_df.sort_index()
+
+        # Umbenennen der Spaltennamen mit "FO-SCL-" Präfix
+        pivot_df.columns = [f"{special_customer}-{amount}" for amount in pivot_df.columns]
+
+        # Multiplikation für DELLAT > 202206
+        for amount, ufc_value in ufc_values.items():
+            column_name = f"{special_customer}-{amount}"
+            if column_name in pivot_df.columns:
+                # Werte setzen: 0 für dellat ≤ 202206, Multiplikation für dellat > 202206
+                pivot_df[column_name] = pivot_df.apply(
+                    lambda row: row[column_name] * ufc_value if row.name > dellat_threshold else 0,
                     axis=1
                 )
 
