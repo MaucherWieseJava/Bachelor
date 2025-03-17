@@ -267,8 +267,12 @@ class ExcelExporterWithSummary:
             29.9: 326.1226
         }
 
-        # Filtere Daten für Customer Name = FO-SCL und Deletion Type in [1, 2, 5]
-        filtered_df = df[(df['Customer Name'] == special_customer) & (df['Deletion Type'].isin([1, 2, 5]))]
+        # Filtere Daten für Customer Name = FO-SCL und Deletion Type in [1, 2, 5], sowie gleiche Werte bei RKMDAT und DELLAT
+        filtered_df = df[
+            (df['Customer Name'] == special_customer) &
+            (df['Deletion Type'].isin([1, 2, 5])) &
+            (df['RKMDAT'] == df['DELLAT'])  # Nur Datensätze mit gleichen Werten in RKMDAT und DELLAT
+            ]
 
         # Generiere eine neue DataFrame für das Worksheet
         summary_data = []
