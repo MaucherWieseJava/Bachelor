@@ -58,7 +58,7 @@ class ExcelExporterWithSummary:
             # Generiere Sheet4 (Deletion Type 3, 4, 6, 7 für RKMDAT)
             print("📊 Erstelle gefilterte Daten für Deletion Type (3, 4, 6, 7)...")
             filtered_summary_df_4 = self.create_filtered_summary_with_special_handling(
-                df, 'RKMDAT', [3, 4, 6, 7], customer_names, rkmdat_values, amount_values, special_customer
+                df, 'DELLAT', [3, 4, 6, 7], customer_names, rkmdat_values, amount_values, special_customer
             )
 
             # Generiere Sheet5 (Deletion Type 1, 2, 5 für DELLAT)
@@ -72,6 +72,9 @@ class ExcelExporterWithSummary:
             print("📂 Erstelle Worksheet für CPO_WID...")
             cpo_wid_df = self.create_cpo_wid(filtered_summary_df_5)
 
+            print("📂 Erstelle Worksheet UFC_NZG...")
+            ufc_nzg_df = self.create_ufc_nzg(df)
+
             # Speichere die Daten in die Excel-Datei
             print("💾 Speichere Daten in die Excel-Datei...")
             with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
@@ -84,7 +87,7 @@ class ExcelExporterWithSummary:
                 # Sheet3: Gefilterte Zusammenfassung (Deletion Type 1, 2, 5 für RKMDAT)
                 filtered_summary_df_3.to_excel(writer, index=False, sheet_name="Widerrufe")
 
-                # Sheet4: Gefilterte Zusammenfassung (Deletion Type 3, 4, 6, 7 für RKMDAT)
+                # Sheet4: Gefilterte Zusammenfassung (Deletion Type 3, 4, 6, 7 für DELLAT)
                 filtered_summary_df_4.to_excel(writer, index=False, sheet_name="#Kündigungen")
 
                 # Sheet5: Gefilterte Zusammenfassung (Deletion Type 1, 2, 5 für DELLAT)
@@ -98,6 +101,8 @@ class ExcelExporterWithSummary:
 
                 # Sheet8: CPO_WID
                 cpo_wid_df.to_excel(writer, index=False, sheet_name="#CPO_WID")
+
+                ufc_nzg_df.to_excel(writer, index=True, sheet_name="UFC_NZG")
 
             conn.close()
             print(f"✅ Export erfolgreich! Datei gespeichert unter: {output_file}")
@@ -194,6 +199,55 @@ class ExcelExporterWithSummary:
                     cpo_wid_df.at[index, col] = row[col] * factor1
 
         return cpo_wid_df
+
+    def create_ufc_nzg(df):
+        # Definierte Variablen
+        special_customer = "FO-SCL"
+        amounts = [9.9, 14.9, 19.9, 24.9, 29.9]
+        rkmdat_threshold = 202206
+        ufc_values = {
+            9.9: 107.9949,
+            14.9: 162.5167,
+            19.9: 271.0588,
+            24.9: 271.6009,
+            29.9: 326.1226
+        }
+
+        # Filtere Daten für Customer Name = FO-SCL
+        filtered_df = df[df['Customer Name'] == special_customer]
+
+        # Generiere eine neue DataFrame für das Worksheet
+        summary_data = []
+        grouped = filtered_df.groupby(['RKMDAT', 'Amount'])
+
+        # Gruppiere nach rkmdat und den Amount-Werten
+        for (rkmdat, amount), group in grouped:
+            if amount in amounts:
+                count = len(group)  # Anzahl der Einträge
+                summary_data.append({'RKMDAT': rkmdat, 'Amount': amount, 'Count': count})
+
+        # Umwandeln in DataFrame für Pivot-Tabelle
+        summary_df = pd.DataFrame(summary_data)
+
+        # Pivot: Zeilen sind 'RKMDAT', Spalten sind 'Amount', Werte sind 'Count'
+        pivot_df = summary_df.pivot(index='RKMDAT', columns='Amount', values='Count').fillna(0)
+        pivot_df = pivot_df.sort_index()
+
+        # Umbenennen der Spaltennamen mit "FO-SCL-" Präfix
+        pivot_df.columns = [f"{special_customer}-{amount}" for amount in pivot_df.columns]
+
+        # Multiplikation für RKMDAT > 202206
+        for amount, ufc_value in ufc_values.items():
+            column_name = f"{special_customer}-{amount}"
+            if column_name in pivot_df.columns:
+                # Werte setzen: 0 für rkmdat ≤ 202206, Multiplikation für rkmdat > 202206
+                pivot_df[column_name] = pivot_df.apply(
+                    lambda row: row[column_name] * ufc_value if row.name > rkmdat_threshold else 0,
+                    axis=1
+                )
+
+        # Rückgabe der Pivot-Tabelle
+        return pivot_df
 
 
 # Hauptprogramm
