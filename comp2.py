@@ -78,6 +78,9 @@ class ExcelExporterWithSummary:
             print("📂 Erstelle Worksheet UFC_WID...")
             ufc_wid_df = self.create_ufc_wid(df)
 
+            print("📂 Erstelle Worksheet UFC_KÜN...")
+            ufc_kün_df = self.create_ufc_kün(df)
+
             # Speichere die Daten in die Excel-Datei
             print("💾 Speichere Daten in die Excel-Datei...")
             with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
@@ -108,6 +111,8 @@ class ExcelExporterWithSummary:
                 ufc_nzg_df.to_excel(writer, index=True, sheet_name="UFC_NZG")
 
                 ufc_wid_df.to_excel(writer, index=True, sheet_name="UFC_WID")
+
+                ufc_kün_df.to_excel(writer, index=True, sheet_name="UFC_KÜN")
 
             conn.close()
             print(f"✅ Export erfolgreich! Datei gespeichert unter: {output_file}")
@@ -305,6 +310,61 @@ class ExcelExporterWithSummary:
                 )
 
         # Rückgabe der Pivot-Tabelle
+        return pivot_df
+
+    def create_ufc_kün(self, df):
+        # Definierte Variablen
+        special_customer = "FO-SCL"
+        amounts = [9.9, 14.9, 19.9, 24.9, 29.9]
+        ufc_values = {
+            9.9: 107.9949,
+            14.9: 162.5167,
+            19.9: 271.0588,
+            24.9: 271.6009,
+            29.9: 326.1226
+        }
+
+        # Filtere Daten für Customer Name = FO-SCL und Deletion Type in [3, 4, 6, 7]
+        filtered_df = df[
+            (df['Customer Name'] == special_customer) &
+            (df['Deletion Type'].isin([3, 4, 6, 7]))
+            ]
+
+        # Überprüfen, ob Start Insurance < End Insurance, und berechne die Differenz in Monaten
+        filtered_df['Start Insurance'] = pd.to_datetime(filtered_df['Start Insurance'])
+        filtered_df['End Insurance'] = pd.to_datetime(filtered_df['End Insurance'])
+        filtered_df = filtered_df[filtered_df['Start Insurance'] < filtered_df['End Insurance']]
+
+        # Berechne die Differenz in Monaten
+        filtered_df['Months Difference'] = (
+                (filtered_df['End Insurance'].dt.year - filtered_df['Start Insurance'].dt.year) * 12 +
+                (filtered_df['End Insurance'].dt.month - filtered_df['Start Insurance'].dt.month)
+        )
+
+        # Berechnung der Beträge für jeden Betrag (Amount)
+        summary_data = []
+        grouped = filtered_df.groupby(['DELLAT', 'Amount'])
+
+        for (dellat, amount), group in grouped:
+            if amount in amounts:
+                total = 0
+                for _, row in group.iterrows():
+                    months = row['Months Difference']
+                    ufc_value = ufc_values[amount]
+                    value = (1 - (months / 24)) * ufc_value
+                    total += value
+
+                summary_data.append({'DELLAT': dellat, f"{special_customer}-{amount}": total})
+
+        # Umwandeln in einen DataFrame
+        summary_df = pd.DataFrame(summary_data)
+
+        # Pivot: Zeilen sind 'DELLAT', Spalten sind 'FO-SCL-{Amount}', Werte sind die berechneten Summen
+        pivot_df = summary_df.pivot(index='DELLAT', columns=lambda x: x if x != 'DELLAT' else None).fillna(0)
+        pivot_df.columns = pivot_df.columns.droplevel(0)  # Entferne die zusätzliche Spaltenebene
+        pivot_df = pivot_df.sort_index()
+
+        # Rückgabe der berechneten Tabelle
         return pivot_df
 
 
