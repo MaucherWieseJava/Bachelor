@@ -324,13 +324,13 @@ class ExcelExporterWithSummary:
             29.9: 326.1226
         }
 
-        # Filtere Daten für Customer Name = FO-SCL und Deletion Type in [3, 4, 6, 7]
+        # Daten für Customer Name = FO-SCL und Deletion Type in [3, 4, 6, 7] filtern
         filtered_df = df[
             (df['Customer Name'] == special_customer) &
             (df['Deletion Type'].isin([3, 4, 6, 7]))
-            ]
+            ].copy()  # Erstelle eine Kopie des gefilterten DataFrames
 
-        # Überprüfen, ob Start Insurance < End Insurance, und berechne die Differenz in Monaten
+        # Überprüfen, ob Start Insurance < End Insurance, und konvertiere die Spalten
         filtered_df['Start Insurance'] = pd.to_datetime(filtered_df['Start Insurance'])
         filtered_df['End Insurance'] = pd.to_datetime(filtered_df['End Insurance'])
         filtered_df = filtered_df[filtered_df['Start Insurance'] < filtered_df['End Insurance']]
