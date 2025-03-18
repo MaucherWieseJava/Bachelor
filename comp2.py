@@ -359,10 +359,10 @@ class ExcelExporterWithSummary:
         # Umwandeln in einen DataFrame
         summary_df = pd.DataFrame(summary_data)
 
-        # Pivot: Zeilen sind 'DELLAT', Spalten sind 'FO-SCL-{Amount}', Werte sind die berechneten Summen
-        pivot_df = summary_df.pivot(index='DELLAT', columns=lambda x: x if x != 'DELLAT' else None).fillna(0)
-        pivot_df.columns = pivot_df.columns.droplevel(0)  # Entferne die zusätzliche Spaltenebene
-        pivot_df = pivot_df.sort_index()
+        # Pivot: Zeilen sind 'DELLAT', Spalten sind dynamisch benannte Beträge (FO-SCL-{Amount})
+        pivot_df = summary_df.pivot_table(index='DELLAT', aggfunc='sum').fillna(0)
+
+        pivot_df = pivot_df.sort_index()  # Sortiere die Tabelle nach DELLAT-Werten
 
         # Rückgabe der berechneten Tabelle
         return pivot_df
