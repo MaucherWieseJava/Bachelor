@@ -327,10 +327,11 @@ class ExcelExporterWithSummary:
         # Daten für Customer Name = FO-SCL und Deletion Type in [3, 4, 6, 7] filtern
         filtered_df = df[
             (df['Customer Name'] == special_customer) &
-            (df['Deletion Type'].isin([3, 4, 6, 7]))
+            (df['Deletion Type'].isin([3, 4, 6, 7])) &
+            (df['RKMDAT'] > 202206)  # Bedingung: RKMDAT > 202206
             ].copy()  # Erstelle eine Kopie des gefilterten DataFrames
 
-        # Überprüfen, ob Start Insurance < End Insurance, und konvertiere die Spalten
+        # Überprüfen, ob Start Insurance < End Insurance, und konvertiere die Spalten in Datumsformate
         filtered_df['Start Insurance'] = pd.to_datetime(filtered_df['Start Insurance'])
         filtered_df['End Insurance'] = pd.to_datetime(filtered_df['End Insurance'])
         filtered_df = filtered_df[filtered_df['Start Insurance'] < filtered_df['End Insurance']]
@@ -341,6 +342,9 @@ class ExcelExporterWithSummary:
                 (filtered_df['End Insurance'].dt.month - filtered_df['Start Insurance'].dt.month)
         )
 
+        # Filtere nur Datensätze, bei denen die Differenz in Monaten < 24 ist
+        filtered_df = filtered_df[filtered_df['Months Difference'] < 24]
+
         # Berechnung der Beträge für jeden Betrag (Amount)
         summary_data = []
         grouped = filtered_df.groupby(['DELLAT', 'Amount'])
@@ -349,6 +353,7 @@ class ExcelExporterWithSummary:
             if amount in amounts:
                 total = 0
                 for _, row in group.iterrows():
+                    # Berechnung nur für gültige Datensätze mit kleiner Abweichung als 2 Jahre
                     months = row['Months Difference']
                     ufc_value = ufc_values[amount]
                     value = (1 - (months / 24)) * ufc_value
