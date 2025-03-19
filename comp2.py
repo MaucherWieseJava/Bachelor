@@ -84,7 +84,7 @@ class ExcelExporterWithSummary:
             ufc_kün_df = self.create_ufc_kün(df)
 
             print("Erstelle Worksheet Result V2...")
-            result_v2_df = self.create_result_v2(df)
+            result_v2_df = self.create_result_v2(cpo_nzg_df, filtered_summary_df_5, ufc_nzg_df, ufc_wid_df, ufc_kün_df)
 
 
             # Speichere die Daten in die Excel-Datei
