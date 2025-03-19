@@ -405,7 +405,7 @@ class ExcelExporterWithSummary:
     def create_result_v2(self, cpo_nzg_df, filtered_summary_df_5, ufc_nzg_df, ufc_wid_df, ufc_kün_df):
         """
         Erstellt das Gesamtübersicht-Sheet 'Result V2' basierend auf den vorhandenen Sheets:
-        - FO-NZG-CPO und FO-CPO-Widerruf für Produktcodes 3402 und 3783
+        - FO-NZG-CPO und FO-CPO-Widerruf
         - UFC_NZG, UFC_Wid und UFC_KÜN für UFC-Relevante Daten
         """
 
@@ -422,35 +422,19 @@ class ExcelExporterWithSummary:
             # Initialisiere eine leere Zeile für das Datum
             row = {'Datum': date}
 
-            # FO-NZG-CPO 3402 (aus cpo_nzg_df: Werte der Spalten FO-ITM, FO-OTM, FO-S2S summieren)
-            nzg_cpo_3402 = cpo_nzg_df.loc[
-                (cpo_nzg_df['RKMDAT'] == date) & (cpo_nzg_df['Product Code'] == 3402),
+            # FO-NZG-CPO (Werte der Spalten FO-ITM, FO-OTM, FO-S2S summieren)
+            nzg_cpo = cpo_nzg_df.loc[
+                (cpo_nzg_df['RKMDAT'] == date),
                 ['FO-ITM', 'FO-OTM', 'FO-S2S']
             ].sum().sum() if date in cpo_nzg_df['RKMDAT'].values else 0
-            row['FO-NZG-CPO 3402'] = nzg_cpo_3402
+            row['FO-NZG-CPO'] = nzg_cpo
 
-            # FO-CPO-Widerruf 3402 (filtered_summary_df_5: Werte der gleichen Spalten summiert, aber negativ)
-            cpo_wid_3402 = filtered_summary_df_5.loc[
-                               (filtered_summary_df_5['DELLAT'] == date) & (
-                                           filtered_summary_df_5['Product Code'] == 3402),
-                               ['FO-ITM', 'FO-OTM', 'FO-S2S']
-                           ].sum().sum() * -1 if date in filtered_summary_df_5['DELLAT'].values else 0
-            row['FO-CPO-Widerruf 3402'] = cpo_wid_3402
-
-            # FO-NZG-CPO 3783
-            nzg_cpo_3783 = cpo_nzg_df.loc[
-                (cpo_nzg_df['RKMDAT'] == date) & (cpo_nzg_df['Product Code'] == 3783),
-                ['FO-ITM', 'FO-OTM', 'FO-S2S']
-            ].sum().sum() if date in cpo_nzg_df['RKMDAT'].values else 0
-            row['FO-NZG-CPO 3783'] = nzg_cpo_3783
-
-            # FO-CPO-Widerruf 3783
-            cpo_wid_3783 = filtered_summary_df_5.loc[
-                               (filtered_summary_df_5['DELLAT'] == date) & (
-                                           filtered_summary_df_5['Product Code'] == 3783),
-                               ['FO-ITM', 'FO-OTM', 'FO-S2S']
-                           ].sum().sum() * -1 if date in filtered_summary_df_5['DELLAT'].values else 0
-            row['FO-CPO-Widerruf 3783'] = cpo_wid_3783
+            # FO-CPO-Widerruf (Werte summiert, aber negativ)
+            cpo_wid = filtered_summary_df_5.loc[
+                          (filtered_summary_df_5['DELLAT'] == date),
+                          ['FO-ITM', 'FO-OTM', 'FO-S2S']
+                      ].sum().sum() * -1 if date in filtered_summary_df_5['DELLAT'].values else 0
+            row['FO-CPO-Widerruf'] = cpo_wid
 
             # F und G werden leer initialisiert
             row['Spalte F'] = ''
