@@ -218,7 +218,7 @@ class ExcelExporterWithSummary:
         ufc_values = {
             9.9: 107.9949,
             14.9: 162.5167,
-            19.9: 271.0588,
+            19.9: 217.0588,
             24.9: 271.6009,
             29.9: 326.1226
         }
@@ -267,7 +267,7 @@ class ExcelExporterWithSummary:
         ufc_values = {
             9.9: 107.9949,
             14.9: 162.5167,
-            19.9: 271.0588,
+            19.9: 217.0588,
             24.9: 271.6009,
             29.9: 326.1226
         }
@@ -313,36 +313,58 @@ class ExcelExporterWithSummary:
         return pivot_df
 
     def create_ufc_kün(self, df):
+        """
+        Erstellt die UFC-KÜN-Zusammenfassung basierend auf FirstDueDate und Last Due Date.
+        Wendet die Berechnung gemäß der Excel-Funktion an:
+        WENN(H4<=L4; DATEDIF(H4; L4; "m") + 1; 0).
+        """
         # Definierte Variablen
         special_customer = "FO-SCL"
         amounts = [9.9, 14.9, 19.9, 24.9, 29.9]
         ufc_values = {
             9.9: 107.9949,
             14.9: 162.5167,
-            19.9: 271.0588,
+            19.9: 21,
             24.9: 271.6009,
             29.9: 326.1226
         }
 
-        # Daten für Customer Name = FO-SCL und Deletion Type in [3, 4, 6, 7] filtern
+        # Filtere relevante Daten (FO-SCL und spezifische Deletion Types)
         filtered_df = df[
             (df['Customer Name'] == special_customer) &
-            (df['Deletion Type'].isin([3, 4, 6, 7])) &
-            (df['RKMDAT'] > 202206)  # Bedingung: RKMDAT > 202206
-            ].copy()  # Erstelle eine Kopie des gefilterten DataFrames
+            (df['Deletion Type'].isin([3, 4, 6, 7])) &  # Nur spezifische Deletion Types
+            (df['RKMDAT'] > 202206)  # Bedingung für RKMDAT
+            ].copy()
 
-        # Überprüfen, ob Start Insurance < End Insurance, und konvertiere die Spalten in Datumsformate
-        filtered_df['Start Insurance'] = pd.to_datetime(filtered_df['Start Insurance'])
-        filtered_df['End Insurance'] = pd.to_datetime(filtered_df['End Insurance'])
-        filtered_df = filtered_df[filtered_df['Start Insurance'] < filtered_df['End Insurance']]
+        # Konvertiere die relevanten Spalten in Datum
+        filtered_df['FirstDueDate'] = pd.to_datetime(filtered_df['FirstDueDate'], errors='coerce')
+        filtered_df['Last Due Date'] = pd.to_datetime(filtered_df['Last Due Date'], errors='coerce')
 
-        # Berechne die Differenz in Monaten
-        filtered_df['Months Difference'] = (
-                (filtered_df['End Insurance'].dt.year - filtered_df['Start Insurance'].dt.year) * 12 +
-                (filtered_df['End Insurance'].dt.month - filtered_df['Start Insurance'].dt.month)
+        # Hilfsfunktion: Berechnung der Differenz in vollen Monaten (DATEDIF + 1)
+        def calculate_month_difference(first_due_date, last_due_date):
+            if first_due_date <= last_due_date:
+                # Berechne die Differenz in Jahren und Monaten
+                years_diff = last_due_date.year - first_due_date.year
+                months_diff = last_due_date.month - first_due_date.month
+                total_months = years_diff * 12 + months_diff
+
+                # Prüfe, ob der letzte Tag kleiner ist als der erste, und korrigiere
+                if last_due_date.day < first_due_date.day:
+                    total_months -= 1
+
+                # +1 zur Differenz hinzufügen (gemäß Excel-Formel)
+                return total_months + 1
+            else:
+                # Rückgabe 0, wenn FirstDueDate > Last Due Date
+                return 0
+
+        # Berechne die Monate mithilfe der Funktion und füge sie als neue Spalte hinzu
+        filtered_df['Months Difference'] = filtered_df.apply(
+            lambda row: calculate_month_difference(row['FirstDueDate'], row['Last Due Date']),
+            axis=1
         )
 
-        # Filtere nur Datensätze, bei denen die Differenz in Monaten < 24 ist
+        # Filtere nur Datensätze, bei denen die Differenz < 24 ist
         filtered_df = filtered_df[filtered_df['Months Difference'] < 24]
 
         # Berechnung der Beträge für jeden Betrag (Amount)
@@ -353,7 +375,7 @@ class ExcelExporterWithSummary:
             if amount in amounts:
                 total = 0
                 for _, row in group.iterrows():
-                    # Berechnung nur für gültige Datensätze mit kleiner Abweichung als 2 Jahre
+                    # Berechnung des Wertes basierend auf der Monatsdifferenz
                     months = row['Months Difference']
                     ufc_value = ufc_values[amount]
                     value = (1 - (months / 24)) * ufc_value
@@ -361,15 +383,15 @@ class ExcelExporterWithSummary:
 
                 summary_data.append({'DELLAT': dellat, f"{special_customer}-{amount}": total})
 
-        # Umwandeln in einen DataFrame
+        # Umwandeln in DataFrame
         summary_df = pd.DataFrame(summary_data)
 
         # Pivot: Zeilen sind 'DELLAT', Spalten sind dynamisch benannte Beträge (FO-SCL-{Amount})
         pivot_df = summary_df.pivot_table(index='DELLAT', aggfunc='sum').fillna(0)
 
-        pivot_df = pivot_df.sort_index()  # Sortiere die Tabelle nach DELLAT-Werten
+        pivot_df = pivot_df.sort_index()  # Sortiere die Tabelle nach DELLAT
 
-        # Rückgabe der berechneten Tabelle
+        # Rückgabe der berechneten Pivot-Tabelle
         return pivot_df
 
 
