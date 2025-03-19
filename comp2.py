@@ -2,6 +2,8 @@ import pyodbc
 import pandas as pd
 import os
 
+from pandas import pivot
+
 
 class ExcelExporterWithSummary:
     def __init__(self, db_connection_string):
@@ -81,6 +83,10 @@ class ExcelExporterWithSummary:
             print("📂 Erstelle Worksheet UFC_KÜN...")
             ufc_kün_df = self.create_ufc_kün(df)
 
+            print("Erstelle Worksheet Result V2...")
+            result_v2_df = self.create_result_v2(df)
+
+
             # Speichere die Daten in die Excel-Datei
             print("💾 Speichere Daten in die Excel-Datei...")
             with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
@@ -113,6 +119,8 @@ class ExcelExporterWithSummary:
                 ufc_wid_df.to_excel(writer, index=True, sheet_name="UFC_WID")
 
                 ufc_kün_df.to_excel(writer, index=True, sheet_name="UFC_KÜN")
+
+                result_v2_df.to_excel(writer, index=False, sheet_name="Result V2")
 
             conn.close()
             print(f"✅ Export erfolgreich! Datei gespeichert unter: {output_file}")
@@ -393,6 +401,83 @@ class ExcelExporterWithSummary:
 
         # Rückgabe der berechneten Pivot-Tabelle
         return pivot_df
+
+    def create_result_v2(self, cpo_nzg_df, filtered_summary_df_5, ufc_nzg_df, ufc_wid_df, ufc_kün_df):
+        """
+        Erstellt das Gesamtübersicht-Sheet 'Result V2' basierend auf den vorhandenen Sheets:
+        - FO-NZG-CPO und FO-CPO-Widerruf für Produktcodes 3402 und 3783
+        - UFC_NZG, UFC_Wid und UFC_KÜN für UFC-Relevante Daten
+        """
+
+        # Kombiniere alle verfügbaren Zeitstempel (RKMDAT oder DELLAT) für eine vollständige Monatsübersicht
+        all_dates = sorted(
+            set(cpo_nzg_df['RKMDAT']).union(filtered_summary_df_5['DELLAT'])
+            .union(ufc_nzg_df.index).union(ufc_wid_df.index).union(ufc_kün_df.index)
+        )
+
+        # Initialisiere eine Ergebnis-Datenstruktur
+        result_data = []
+
+        for date in all_dates:
+            # Initialisiere eine leere Zeile für das Datum
+            row = {'Datum': date}
+
+            # FO-NZG-CPO 3402 (aus cpo_nzg_df: Werte der Spalten FO-ITM, FO-OTM, FO-S2S summieren)
+            nzg_cpo_3402 = cpo_nzg_df.loc[
+                (cpo_nzg_df['RKMDAT'] == date) & (cpo_nzg_df['Product Code'] == 3402),
+                ['FO-ITM', 'FO-OTM', 'FO-S2S']
+            ].sum().sum() if date in cpo_nzg_df['RKMDAT'].values else 0
+            row['FO-NZG-CPO 3402'] = nzg_cpo_3402
+
+            # FO-CPO-Widerruf 3402 (filtered_summary_df_5: Werte der gleichen Spalten summiert, aber negativ)
+            cpo_wid_3402 = filtered_summary_df_5.loc[
+                               (filtered_summary_df_5['DELLAT'] == date) & (
+                                           filtered_summary_df_5['Product Code'] == 3402),
+                               ['FO-ITM', 'FO-OTM', 'FO-S2S']
+                           ].sum().sum() * -1 if date in filtered_summary_df_5['DELLAT'].values else 0
+            row['FO-CPO-Widerruf 3402'] = cpo_wid_3402
+
+            # FO-NZG-CPO 3783
+            nzg_cpo_3783 = cpo_nzg_df.loc[
+                (cpo_nzg_df['RKMDAT'] == date) & (cpo_nzg_df['Product Code'] == 3783),
+                ['FO-ITM', 'FO-OTM', 'FO-S2S']
+            ].sum().sum() if date in cpo_nzg_df['RKMDAT'].values else 0
+            row['FO-NZG-CPO 3783'] = nzg_cpo_3783
+
+            # FO-CPO-Widerruf 3783
+            cpo_wid_3783 = filtered_summary_df_5.loc[
+                               (filtered_summary_df_5['DELLAT'] == date) & (
+                                           filtered_summary_df_5['Product Code'] == 3783),
+                               ['FO-ITM', 'FO-OTM', 'FO-S2S']
+                           ].sum().sum() * -1 if date in filtered_summary_df_5['DELLAT'].values else 0
+            row['FO-CPO-Widerruf 3783'] = cpo_wid_3783
+
+            # F und G werden leer initialisiert
+            row['Spalte F'] = ''
+            row['Spalte G'] = ''
+
+            # FO-NZG-UFC (Werte aus UFC_NZG summieren für das Datum)
+            ufc_nzg = ufc_nzg_df.loc[date].sum().sum() if date in ufc_nzg_df.index else 0
+            row['FO-NZG-UFC'] = ufc_nzg
+
+            # FO-Widerruf-UFC (Werte aus UFC_WID summieren und negativ machen)
+            ufc_wid = ufc_wid_df.loc[date].sum().sum() * -1 if date in ufc_wid_df.index else 0
+            row['FO-Widerruf-UFC'] = ufc_wid
+
+            # FO-CB-UFC (Werte aus UFC_KÜN summieren und negativ machen)
+            ufc_cb = ufc_kün_df.loc[date].sum().sum() * -1 if date in ufc_kün_df.index else 0
+            row['FO-CB-UFC'] = ufc_cb
+
+            # Zeile zur Ergebnisliste hinzufügen
+            result_data.append(row)
+
+        # Konvertiere die Ergebnisliste in einen DataFrame
+        result_v2_df = pd.DataFrame(result_data).fillna(0)
+
+        # Sortiere nach Datum
+        result_v2_df = result_v2_df.sort_values(by='Datum')
+
+        return result_v2_df
 
 
 # Hauptprogramm
