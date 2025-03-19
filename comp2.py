@@ -429,12 +429,15 @@ class ExcelExporterWithSummary:
             ].sum().sum() if date in cpo_nzg_df['RKMDAT'].values else 0
             row['FO-NZG-CPO'] = nzg_cpo
 
-            # FO-CPO-Widerruf (Werte summiert, aber negativ)
-            cpo_wid = filtered_summary_df_5.loc[
-                          (filtered_summary_df_5['DELLAT'] == date),
-                          ['FO-ITM', 'FO-OTM', 'FO-S2S']
-                      ].sum().sum() * -1 if date in filtered_summary_df_5['DELLAT'].values else 0
+
+
+            # FO-CPO-Widerruf: Summiere alle positiven Werte aus CPO_WID und setze positives Vorzeichen auf negativ
+            cpo_wid = cpo_wid_df.loc[
+                          (cpo_wid_df['DELLAT'] == date)
+                      ].select_dtypes(include=[float, int]).clip(lower=0).sum().sum() * -1 if date in cpo_wid_df[
+                'DELLAT'].values else 0
             row['FO-CPO-Widerruf'] = cpo_wid
+
 
             # F und G werden leer initialisiert
             row['Spalte F'] = ''
