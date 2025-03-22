@@ -20,7 +20,7 @@ class ExcelExporterWithSummary:
             conn = pyodbc.connect(self.db_connection_string)
 
             # Lade alle Daten aus der Tabelle
-            query = f"SELECT * FROM [dbo].[Tabelle1$]"
+            query = f"SELECT * FROM [dbo].[EXSB_BA]"
             print(f"🔍 Lade Daten aus der Tabelle '{table_name}'...")
             df = pd.read_sql_query(query, conn)
 
@@ -83,8 +83,8 @@ class ExcelExporterWithSummary:
             print("📂 Erstelle Worksheet UFC_KÜN...")
             ufc_kün_df = self.create_ufc_kün(df)
 
-            print("Erstelle Worksheet Result V2...")
-            result_v2_df = self.create_result_v2(cpo_nzg_df, filtered_summary_df_5, ufc_nzg_df, ufc_wid_df, ufc_kün_df)
+            print("📂 Erstelle Worksheet Result V2...")
+            result_v2_df = self.create_result_v2(cpo_nzg_df, cpo_wid_df, filtered_summary_df_5, ufc_nzg_df, ufc_wid_df, ufc_kün_df)
 
 
             # Speichere die Daten in die Excel-Datei
@@ -402,7 +402,7 @@ class ExcelExporterWithSummary:
         # Rückgabe der berechneten Pivot-Tabelle
         return pivot_df
 
-    def create_result_v2(self, cpo_nzg_df, filtered_summary_df_5, ufc_nzg_df, ufc_wid_df, ufc_kün_df):
+    def create_result_v2(self, cpo_nzg_df, cpo_wid_df, filtered_summary_df_5, ufc_nzg_df, ufc_wid_df, ufc_kün_df):
         """
         Erstellt das Gesamtübersicht-Sheet 'Result V2' basierend auf den vorhandenen Sheets:
         - FO-NZG-CPO und FO-CPO-Widerruf
@@ -471,12 +471,13 @@ class ExcelExporterWithSummary:
 if __name__ == '__main__':
     db_connection_string = (
         "DRIVER={ODBC Driver 17 for SQL Server};"
-        "SERVER=your_server_name;"
-        "DATABASE=your_database_name;"
-        "Trusted_Connection=yes;"
+        "SERVER=bachelorstoetzler.database.windows.net;"  # Dein Servername
+        "DATABASE=Bachelor;"  # Der Name deiner Datenbank
+        "AUTHENTICATION=ActiveDirectoryInteractive;"  # Azure Active Directory Authentication
+        "UID=wi22231@lehre.dhbw-stuttgart.de;"  # Dein Nutzername
     )
 
-    table_name = "your_table_name"
+    table_name = "EXSB_BA"
 
     exporter = ExcelExporterWithSummary(db_connection_string)
     exporter.export_table_with_summary(table_name)
