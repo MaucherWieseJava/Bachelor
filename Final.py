@@ -7,7 +7,6 @@ class ExcelExporterWithSummary:
 
     def export_table_with_summary(self):
         try:
-            # Definiere den Pfad für die zu speichernde Datei (Desktop)
             desktop_path = os.path.join(os.environ["HOME"], "Desktop")
             output_file = os.path.join(desktop_path, "EXSB_Export.xlsx")
 
@@ -28,54 +27,64 @@ class ExcelExporterWithSummary:
             amount_values = df['Amount'].unique()
             special_customer = 'FO-SCL'  # Nur Customer FO-SCL wird unterteilt
 
-            # Generiere Sheet2 (Zusammenfassung RKMDAT und Kampagne)
             print("📊 Erstelle Zusammenfassungen für RKMDAT...")
             summary_df = self.create_summary_with_special_handling(
                 df, 'RKMDAT', customer_names, rkmdat_values, amount_values, special_customer
             )
 
-            # Generiere Sheet3 (Deletion Type 1, 2, 5 für RKMDAT)
             print("📊 Erstelle gefilterte Daten für Deletion Type (1, 2, 5)...")
             filtered_summary_df_3 = self.create_filtered_summary_with_special_handling(
                 df, 'RKMDAT', [1, 2, 5], customer_names, rkmdat_values, amount_values, special_customer
             )
 
-            # Berechne die Widerrufsquote und füge sie als separates Sheet hinzu
             print("🔢 Berechne Widerrufsquote und erstelle neues Worksheet...")
             widerrufsquote_df = self.calculate_widerrufsquote(summary_df, filtered_summary_df_3)
 
-            # Generiere Sheet6 (CPO_NZG basierend auf Sheet2)
             print("📂 Erstelle Worksheet für CPO_NZG...")
             cpo_nzg_df = self.create_cpo_nzg(summary_df)
 
-            # Generiere Sheet4 (Deletion Type 3, 4, 6, 7 für RKMDAT)
             print("📊 Erstelle gefilterte Daten für Deletion Type (3, 4, 6, 7)...")
             filtered_summary_df_4 = self.create_filtered_summary_with_special_handling(
                 df, 'DELLAT', [3, 4, 6, 7], customer_names, rkmdat_values, amount_values, special_customer
             )
 
-            # Generiere Sheet5 (Deletion Type 1, 2, 5 für DELLAT)
+
             print("📊 Erstelle gefilterte Daten für Deletion Type (1, 2, 5) mit 'DELLAT'...")
             dellat_values = df['DELLAT'].unique()
             filtered_summary_df_5 = self.create_filtered_summary_with_special_handling(
                 df, 'DELLAT', [1, 2, 5], customer_names, dellat_values, amount_values, special_customer
             )
 
-            # Erstelle Worksheet für CPO_WID
             print("📂 Erstelle Worksheet für CPO_WID...")
             cpo_wid_df = self.create_cpo_wid(filtered_summary_df_5)
+            if cpo_wid_df is None:
+                print("❌ Fehler: create_cpo_wid hat None zurückgegeben.")
+                return
 
             print("📂 Erstelle Worksheet UFC_NZG...")
             ufc_nzg_df = self.create_ufc_nzg(df)
+            if ufc_nzg_df is None:
+                print("❌ Fehler: create_ufc_nzg hat None zurückgegeben.")
+                return
 
             print("📂 Erstelle Worksheet UFC_WID...")
             ufc_wid_df = self.create_ufc_wid(df)
+            if ufc_wid_df is None:
+                print("❌ Fehler: create_ufc_wid hat None zurückgegeben.")
+                return
 
             print("📂 Erstelle Worksheet UFC_KÜN...")
             ufc_kün_df = self.create_ufc_kün(df)
+            if ufc_kün_df is None:
+                print("❌ Fehler: create_ufc_kün hat None zurückgegeben.")
+                return
 
             print("📂 Erstelle Worksheet Result V2...")
             result_v2_df = self.create_result_v2(cpo_nzg_df, cpo_wid_df, filtered_summary_df_5, ufc_nzg_df, ufc_wid_df, ufc_kün_df)
+            if result_v2_df is None:
+                print("❌ Fehler: create_result_v2 hat None zurückgegeben.")
+                return
+
 
             # Speichere die Daten in die Excel-Datei
             print("💾 Speichere Daten in die Excel-Datei...")
@@ -117,7 +126,7 @@ class ExcelExporterWithSummary:
         except Exception as e:
             print(f"❌ Fehler beim Export: {e}")
 
-    # Die restlichen Methoden bleiben unverändert
+
 
     def create_summary_with_special_handling(self, df, column, customer_names, unique_values, amount_values,
                                              special_customer):
@@ -190,24 +199,82 @@ class ExcelExporterWithSummary:
         if not isinstance(filtered_summary_df_5, pd.DataFrame) or filtered_summary_df_5.empty:
             raise ValueError("Fehler: filtered_summary_df_5 ist leer oder ungültig.")
 
+        print("🔄 Starte Erstellung von cpo_wid_df...")
+
         cpo_wid_df = filtered_summary_df_5.copy()
+        if 'DELLAT' not in cpo_wid_df.columns:
+            print("❌ Fehler: Spalte 'DELLAT' fehlt in cpo_wid_df.")
+            return pd.DataFrame()
+        else:
+            print("✅ Spalte 'DELLAT' gefunden in cpo_wid_df.")
+
+        try:
+            min_dellat = int(cpo_wid_df['DELLAT'].min())
+            max_dellat = int(cpo_wid_df['DELLAT'].max())
+            dellat_range = pd.date_range(start=f"{min_dellat // 100}-{min_dellat % 100:02d}",
+                                         end=f"{max_dellat // 100}-{max_dellat % 100:02d}",
+                                         freq='MS').strftime('%Y%m').astype(int)
+        except Exception as e:
+            print(f"❌ Fehler beim Generieren der DELLAT-Werte: {e}")
+            return pd.DataFrame()
+
+        for dellat in dellat_range:
+            if dellat not in cpo_wid_df['DELLAT'].values:
+                cpo_wid_df = cpo_wid_df.append({'DELLAT': dellat}, ignore_index=True)
+                print(f"➕ Fehlender DELLAT-Wert hinzugefügt: {dellat}")
+
+        cpo_wid_df = cpo_wid_df.sort_values(by='DELLAT').reset_index(drop=True)
 
         for index, row in cpo_wid_df.iterrows():
-            if index == 0 and not isinstance(row[0], (int, float)):
+            if index == 0 and not isinstance(row.iloc[0], (int, float)):
+                print(f"⚠️ Überspringe erste Zeile, da der Wert kein int oder float ist: {row.iloc[0]}")
                 continue
 
-            dellat = row[0]
+            dellat = row.iloc[0]
             try:
                 dellat = int(dellat)
                 factor1 = 59.9 if dellat > 202206 else 49.9
-            except ValueError:
+                print(f"🔢 DELLAT Wert: {dellat}, Faktor: {factor1}")
+            except ValueError as e:
+                print(f"❌ Fehler beim Konvertieren von DELLAT: {e}")
                 continue
 
             for col in cpo_wid_df.columns[1:]:
                 if pd.notna(row[col]) and isinstance(row[col], (int, float)):
+                    original_value = row[col]
                     cpo_wid_df.at[index, col] = row[col] * factor1
+                    print(f"🔄 Aktualisiere Wert in Spalte '{col}' von {original_value} zu {cpo_wid_df.at[index, col]}")
 
-        return cpo_wid_df
+        try:
+            cpo_wid_df['DELLAT2'] = cpo_wid_df['DELLAT'].copy()
+            print("✅ Spalte 'DELLAT2' erfolgreich hinzugefügt.")
+        except Exception as e:
+            print(f"❌ Fehler beim Hinzufügen der Spalte 'DELLAT2': {e}")
+
+        # Neue Spalte 'FO' = alles zusammenaddiert 'FO-S2S', 'FO-ITM' und 'FO-OTM'
+        try:
+            cpo_wid_df['FO'] = cpo_wid_df[['FO-S2S', 'FO-ITM', 'FO-OTM']].sum(axis=1)
+            print("✅ Spalte 'FO' erfolgreich hinzugefügt.")
+        except Exception as e:
+            print(f"❌ Fehler beim Hinzufügen der Spalte 'FO': {e}")
+
+        # Neue Spalte 'JD' = WErte aus 'JD-OTM' und 'JD-ITM' zusammenaddieren
+        try:
+            cpo_wid_df['JD'] = cpo_wid_df[['JD-OTM', 'JD-ITM']].sum(axis=1)
+            print("✅ Spalte 'JD' erfolgreich hinzugefügt.")
+        except Exception as e:
+            print(f"❌ Fehler beim Hinzufügen der Spalte 'JD': {e}")
+
+        try:
+            cpo_wid_df_sorted = cpo_wid_df.sort_values(by='DELLAT')
+            print("✅ DataFrame erfolgreich nach 'DELLAT' sortiert.")
+        except Exception as e:
+            print(f"❌ Fehler beim Sortieren des DataFrames nach 'DELLAT': {e}")
+
+        for index, row in cpo_wid_df_sorted.iterrows():
+            print(f"Zeile {index + 1}, Erste Spalte: {row.iloc[0]}")
+
+        return cpo_wid_df_sorted
 
     def create_ufc_nzg(self, df):
         # Definierte Variablen
@@ -420,19 +487,33 @@ class ExcelExporterWithSummary:
             ].sum().sum() if date in cpo_nzg_df['RKMDAT'].values else 0
             row['FO-NZG-CPO'] = nzg_cpo
 
-
-
             # FO-CPO-Widerruf: Summiere alle positiven Werte aus CPO_WID und setze positives Vorzeichen auf negativ
-            cpo_wid = cpo_wid_df.loc[
-                          (cpo_wid_df['DELLAT'] == date)
-                      ].select_dtypes(include=[float, int]).clip(lower=0).sum().sum() * -1 if date in cpo_wid_df[
-                'DELLAT'].values else 0
-            row['FO-CPO-Widerruf'] = cpo_wid
+            fo_cpo_wid = cpo_wid_df.loc[
+                (cpo_wid_df['DELLAT'] == date),
+                'FO'
+            ].sum() if date in cpo_wid_df['DELLAT'].values else 0
+            row['FO-CPO-Widerruf'] = fo_cpo_wid
 
+            row['RE Call Center'] = ''
+            row['IST - SOLL'] = ''
+
+            # JD-NZG-CPO (Werte der Spalten JD-OTM und JD-ITM summieren)
+            jd_nzg_cpo = cpo_nzg_df.loc[
+                (cpo_nzg_df['RKMDAT'] == date),
+                ['JD-OTM', 'JD-ITM']
+            ].sum().sum() if date in cpo_nzg_df['RKMDAT'].values else 0
+            row['JD-NZG-CPO'] = jd_nzg_cpo
+
+            # JD-CPO-Widerruf: Summiere alle positiven Werte aus CPO_WID und setze positives Vorzeichen auf negativ
+            jd_cpo_wid = cpo_wid_df.loc[
+                (cpo_wid_df['DELLAT'] == date),
+                'JD'
+            ].sum() if date in cpo_wid_df['DELLAT'].values else 0
+            row['JD-CPO-Widerruf'] = jd_cpo_wid
 
             # F und G werden leer initialisiert
-            row['Spalte F'] = ''
-            row['Spalte G'] = ''
+            row['RE Call Center'] = ''
+            row['IST - SOLL'] = ''
 
             # FO-NZG-UFC (Werte aus UFC_NZG summieren für das Datum)
             ufc_nzg = ufc_nzg_df.loc[date].sum().sum() if date in ufc_nzg_df.index else 0
@@ -445,6 +526,43 @@ class ExcelExporterWithSummary:
             # FO-CB-UFC (Werte aus UFC_KÜN summieren und negativ machen)
             ufc_cb = ufc_kün_df.loc[date].sum().sum() * -1 if date in ufc_kün_df.index else 0
             row['FO-CB-UFC'] = ufc_cb
+
+            row['RE Call Center'] = ''
+            row['IST - SOLL'] = ''
+
+            ts_nzg_cpo = cpo_nzg_df.loc[
+                (cpo_nzg_df['RKMDAT'] == date),
+                ['TS-OTM']
+            ].sum().sum() if date in cpo_nzg_df['RKMDAT'].values else 0
+            row['TS-NZG-CPO'] = ts_nzg_cpo
+
+            ts_cpo_wid = cpo_wid_df.loc[
+                (cpo_wid_df['DELLAT'] == date),
+                'TS-OTM'
+            ].sum() if date in cpo_wid_df['DELLAT'].values else 0
+            row['TS-CPO-Widerruf'] = ts_cpo_wid
+
+            row['RE Call Center'] = ''
+            row['IST - SOLL'] = ''
+
+
+            m3_nzg_cpo = cpo_nzg_df.loc[
+                (cpo_nzg_df['RKMDAT'] == date),
+                ['M3-OTM']
+            ].sum().sum() if date in cpo_nzg_df['RKMDAT'].values else 0
+            row['M3-NZG-CPO'] = m3_nzg_cpo
+
+
+            m3_cpo_wid = cpo_wid_df.loc[
+                (cpo_wid_df['DELLAT'] == date),
+                'M3-OTM'
+            ].sum() if date in cpo_wid_df['DELLAT'].values else 0
+            row['M3-CPO-Widerruf'] = m3_cpo_wid
+
+            row['RE Call Center'] = ''
+            row['IST - SOLL'] = ''
+
+
 
             # Zeile zur Ergebnisliste hinzufügen
             result_data.append(row)
