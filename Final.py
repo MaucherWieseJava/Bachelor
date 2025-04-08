@@ -253,7 +253,7 @@ class ExcelExporterWithSummary:
 
         # Neue Spalte 'FO' = alles zusammenaddiert 'FO-S2S', 'FO-ITM' und 'FO-OTM'
         try:
-            cpo_wid_df['FO'] = cpo_wid_df[['FO-S2S', 'FO-ITM', 'FO-OTM']].sum(axis=1)
+            cpo_wid_df['FO'] = cpo_wid_df[['FO-S2S', 'FO-ITM', 'FO-OTM', 'FO-SCL - 19.9', 'FO-SCL - 9.9', 'FO-SCL - 14.9', 'FO-SCL - 29.9', 'FO-SCL - 24.9']].sum(axis=1)
             print("✅ Spalte 'FO' erfolgreich hinzugefügt.")
         except Exception as e:
             print(f"❌ Fehler beim Hinzufügen der Spalte 'FO': {e}")
@@ -342,7 +342,7 @@ class ExcelExporterWithSummary:
         filtered_df = df[
             (df['Kampagne'] == special_customer) &
             (df['Deletion Type'].isin([1, 2, 5])) &
-            (df['RKMDAT'] == df['DELLAT'])  # Nur Datensätze mit gleichen Werten in RKMDAT und DELLAT
+            (df['RKMDAT'] > 202206)  # Nur Datensätze mit gleichen Werten in RKMDAT und DELLAT
             ]
 
         # Generiere eine neue DataFrame für das Worksheet
@@ -483,7 +483,7 @@ class ExcelExporterWithSummary:
             # FO-NZG-CPO (Werte der Spalten FO-ITM, FO-OTM, FO-S2S summieren)
             nzg_cpo = cpo_nzg_df.loc[
                 (cpo_nzg_df['RKMDAT'] == date),
-                ['FO-ITM', 'FO-OTM', 'FO-S2S']
+                ['FO-ITM', 'FO-OTM', 'FO-S2S', 'FO-SCL - 19.9', 'FO-SCL - 9.9' ,'FO-SCL - 14.9', 'FO-SCL - 29.9', 'FO-SCL - 24.9']
             ].sum().sum() if date in cpo_nzg_df['RKMDAT'].values else 0
             row['FO-NZG-CPO'] = nzg_cpo
 
@@ -512,8 +512,8 @@ class ExcelExporterWithSummary:
             row['JD-CPO-Widerruf'] = jd_cpo_wid
 
             # F und G werden leer initialisiert
-            row['RE Call Center'] = ''
-            row['IST - SOLL'] = ''
+            row['RE Call Center JD'] = ''
+            row['IST - SOLL JD'] = ''
 
             # FO-NZG-UFC (Werte aus UFC_NZG summieren für das Datum)
             ufc_nzg = ufc_nzg_df.loc[date].sum().sum() if date in ufc_nzg_df.index else 0
@@ -527,8 +527,8 @@ class ExcelExporterWithSummary:
             ufc_cb = ufc_kün_df.loc[date].sum().sum() * -1 if date in ufc_kün_df.index else 0
             row['FO-CB-UFC'] = ufc_cb
 
-            row['RE Call Center'] = ''
-            row['IST - SOLL'] = ''
+            row['RE Call Center UFC'] = ''
+            row['IST - SOLL UFC'] = ''
 
             ts_nzg_cpo = cpo_nzg_df.loc[
                 (cpo_nzg_df['RKMDAT'] == date),
@@ -542,8 +542,8 @@ class ExcelExporterWithSummary:
             ].sum() if date in cpo_wid_df['DELLAT'].values else 0
             row['TS-CPO-Widerruf'] = ts_cpo_wid
 
-            row['RE Call Center'] = ''
-            row['IST - SOLL'] = ''
+            row['RE Call Center TS'] = ''
+            row['IST - SOLL TS'] = ''
 
 
             m3_nzg_cpo = cpo_nzg_df.loc[
@@ -559,8 +559,8 @@ class ExcelExporterWithSummary:
             ].sum() if date in cpo_wid_df['DELLAT'].values else 0
             row['M3-CPO-Widerruf'] = m3_cpo_wid
 
-            row['RE Call Center'] = ''
-            row['IST - SOLL'] = ''
+            row['RE Call Center M3'] = ''
+            row['IST - SOLL M3'] = ''
 
 
 
